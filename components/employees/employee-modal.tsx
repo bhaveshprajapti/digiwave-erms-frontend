@@ -469,16 +469,19 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                       </td>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Password</th>
                       <td className="p-2 border">
-                        {mode === 'add' && (
-                          <Input
-                            id="password"
-                            type="password"
-                            placeholder="Enter password"
-                            required
-                            className="h-9"
-                            value={formData.password}
-                            onChange={(e) => handleChange("password", e.target.value)}
-                          />
+                        <Input
+                          id="password"
+                          type="password"
+                          placeholder={mode === 'add' ? "Enter password" : "Leave blank to keep current password"}
+                          required={mode === 'add'}
+                          className="h-9"
+                          value={formData.password}
+                          onChange={(e) => handleChange("password", e.target.value)}
+                        />
+                        {mode === 'edit' && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Leave blank to keep the current password unchanged
+                          </p>
                         )}
                       </td>
                     </tr>

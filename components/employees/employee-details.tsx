@@ -117,7 +117,7 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
     joining_date: "2022-01-15",
     salary: "85000.00",
     is_active: true,
-    technologies: ["React", "Node.js", "TypeScript", "PostgreSQL"]
+    technologies: [1, 2, 3, 4]
   }
 
   const dummyLeaveBalance: LeaveBalance[] = [

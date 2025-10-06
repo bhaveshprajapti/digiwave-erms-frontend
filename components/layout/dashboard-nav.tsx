@@ -15,6 +15,7 @@ import {
   Building2,
   Shield,
   FileBarChart,
+  CheckSquare,
 } from "lucide-react"
 
 const navItems = [
@@ -30,6 +31,7 @@ const navItems = [
 ]
 
 const adminItems = [
+  { href: "/dashboard/profile-requests", label: "Profile Update Requests", icon: CheckSquare },
   { href: "/dashboard/settings/roles", label: "Roles", icon: Shield },
   { href: "/dashboard/settings/employee-types", label: "Employee Types", icon: Users },
   { href: "/dashboard/settings/designations", label: "Designations", icon: Users },

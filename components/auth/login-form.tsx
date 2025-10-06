@@ -40,11 +40,19 @@ export function LoginForm() {
 
       if (userResp.data) {
         localStorage.setItem("user", JSON.stringify(userResp.data))
+        
+        // Redirect based on user role
+        if (userResp.data.is_superuser || userResp.data.is_staff) {
+          // Admin/Staff users go to admin dashboard
+          router.push("/dashboard")
+        } else {
+          // Regular employees go to employee dashboard
+          router.push("/employee-dashboard")
+        }
       } else {
         console.error("Failed to fetch user data after login.")
+        router.push("/dashboard") // Fallback
       }
-
-      router.push("/dashboard")
     } catch (err: any) {
       let errorMessage = "An unexpected error occurred."
       if (err.response) {
