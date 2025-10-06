@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Mail, Phone, MapPin, Calendar, Briefcase, Clock, FileText } from "lucide-react"
 import api from "@/lib/api"
+import { useEmployeeTypes, useRoles, useShifts, useTechnologies } from "@/hooks/use-common"
+import { useDesignations } from "@/hooks/use-designations"
 
 interface EmployeeDetailsProps {
   employeeId: string
@@ -31,7 +33,9 @@ interface Employee {
   is_active?: boolean
   status?: string
   role?: number | { id: number; name: string; display_name: string }
-  technologies?: string[]
+  technologies?: number[] | Array<{id: number; name: string}>
+  shifts?: number[] | Array<{id: number; name: string; start_time: string; end_time: string}>
+  designations?: number[] | Array<{id: number; title: string}>
   shift?: string | { id: number; name: string }
   birth_date?: string | null
   emergency_contact?: string | null
@@ -90,6 +94,13 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
   const [recentActivity, setRecentActivity] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Fetch reference data
+  const { employeeTypes } = useEmployeeTypes()
+  const { roles } = useRoles()
+  const { designations } = useDesignations()
+  const { technologies } = useTechnologies()
+  const { shifts } = useShifts()
 
   // Default dummy data
   const dummyEmployee: Employee = {
@@ -283,8 +294,15 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
                   <span className="text-sm font-medium">{employeeTypeName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Designation</span>
-                  <span className="text-sm font-medium">{designationName}</span>
+                  <span className="text-sm text-muted-foreground">Designations</span>
+                  <span className="text-sm font-medium">
+                    {employee?.designations && Array.isArray(employee.designations) && employee.designations.length > 0
+                      ? employee.designations.map((d: any) => {
+                          const designation = designations?.find(des => des.id === (typeof d === 'number' ? d : d.id))
+                          return designation?.title
+                        }).filter(Boolean).join(', ')
+                      : 'Not specified'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Salary</span>
@@ -293,6 +311,28 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Role</span>
                   <span className="text-sm font-medium">{roleName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Technologies</span>
+                  <span className="text-sm font-medium">
+                    {employee?.technologies && Array.isArray(employee.technologies) && employee.technologies.length > 0
+                      ? employee.technologies.map((t: any) => {
+                          const tech = technologies?.find(tech => tech.id === (typeof t === 'number' ? t : t.id))
+                          return tech?.name
+                        }).filter(Boolean).join(', ')
+                      : 'Not specified'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Shifts</span>
+                  <span className="text-sm font-medium">
+                    {employee?.shifts && Array.isArray(employee.shifts) && employee.shifts.length > 0
+                      ? employee.shifts.map((s: any) => {
+                          const shift = shifts?.find(sh => sh.id === (typeof s === 'number' ? s : s.id))
+                          return shift ? `${shift.name} (${shift.start_time}-${shift.end_time})` : null
+                        }).filter(Boolean).join(', ')
+                      : 'Not specified'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Status</span>
@@ -403,8 +443,22 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
                 <div className="flex justify-between">
                   <span className="text-sm text-muted-foreground">Technologies</span>
                   <span className="text-sm font-medium">
-                    {employee?.technologies && Array.isArray(employee.technologies) && employee.technologies.length > 0 
-                      ? employee.technologies.join(', ') 
+                    {employee?.technologies && Array.isArray(employee.technologies) && employee.technologies.length > 0
+                      ? employee.technologies.map((t: any) => {
+                          const tech = technologies?.find(tech => tech.id === (typeof t === 'number' ? t : t.id))
+                          return tech?.name
+                        }).filter(Boolean).join(', ')
+                      : 'Not specified'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Shifts</span>
+                  <span className="text-sm font-medium">
+                    {employee?.shifts && Array.isArray(employee.shifts) && employee.shifts.length > 0
+                      ? employee.shifts.map((s: any) => {
+                          const shift = shifts?.find(sh => sh.id === (typeof s === 'number' ? s : s.id))
+                          return shift ? `${shift.name} (${shift.start_time}-${shift.end_time})` : null
+                        }).filter(Boolean).join(', ')
                       : 'Not specified'}
                   </span>
                 </div>

@@ -11,6 +11,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast"
 import { deleteEmployee } from "@/hooks/use-employees"
 import { EmployeeModal } from "./employee-modal"
+import api from "@/lib/api"
 
 import { useEmployees } from "@/hooks/use-employees"
 import { useEmployeeTypes, useDesignations } from "@/hooks/use-common"
@@ -101,10 +102,25 @@ export function EmployeeList() {
     setIsModalOpen(true)
   }
 
-  const handleEditEmployee = (employee: EmployeeListItem) => {
-    setModalMode('edit')
-    setSelectedEmployee(employee)
-    setIsModalOpen(true)
+  const handleEditEmployee = async (employee: EmployeeListItem) => {
+    try {
+      // Fetch complete employee details for editing using API utility
+      const response = await api.get(`/accounts/users/${employee.id}/`)
+      
+      if (response.data) {
+        console.log('🔍 Full employee data for edit:', response.data)
+        setModalMode('edit')
+        setSelectedEmployee(response.data)
+        setIsModalOpen(true)
+      }
+    } catch (error) {
+      console.error('Error fetching employee details:', error)
+      toast({
+        title: "Error", 
+        description: "Failed to fetch employee details",
+        variant: "destructive",
+      })
+    }
   }
   const handleRefresh = () => {
     // Use SWR's mutate to refresh the data without full page reload

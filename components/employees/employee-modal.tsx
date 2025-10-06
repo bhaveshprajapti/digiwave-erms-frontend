@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import { createEmployee, updateEmployee } from "@/hooks/use-employees"
 import { useEmployeeTypes, useRoles, useShifts, useTechnologies } from "@/hooks/use-common"
 import { useDesignations } from "@/hooks/use-designations"
+import api from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,6 +48,8 @@ interface EmployeeFormData {
   account_number: string
   ifsc_code: string
   branch: string
+  emergency_contact: string
+  emergency_phone: string
   profile_picture: File | null
 }
 
@@ -100,6 +103,8 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
     account_number: "",
     ifsc_code: "",
     branch: "",
+    emergency_contact: "",
+    emergency_phone: "",
     profile_picture: null,
   })
 
@@ -109,9 +114,38 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [selectedTechnologies, setSelectedTechnologies] = useState<string[]>([])
 
+  // Function to fetch address text from address ID
+  const fetchAddressText = async (addressId: number): Promise<string> => {
+    try {
+      const response = await api.get(`/common/addresses/${addressId}/`)
+      if (response.data) {
+        return response.data.line1 || ''
+      }
+    } catch (error) {
+      console.error('Error fetching address:', error)
+    }
+    return ''
+  }
 
   useEffect(() => {
-    if (employee && mode === 'edit') {
+    const loadEmployeeData = async () => {
+      if (employee && mode === 'edit') {
+        // Fetch address texts if they are IDs
+        let currentAddressText = ''
+        let permanentAddressText = ''
+        
+        if (typeof employee.current_address === 'number') {
+          currentAddressText = await fetchAddressText(employee.current_address)
+        } else if (typeof employee.current_address === 'object' && employee.current_address?.line1) {
+          currentAddressText = employee.current_address.line1
+        }
+        
+        if (typeof employee.permanent_address === 'number') {
+          permanentAddressText = await fetchAddressText(employee.permanent_address)
+        } else if (typeof employee.permanent_address === 'object' && employee.permanent_address?.line1) {
+          permanentAddressText = employee.permanent_address.line1
+        }
+
       setFormData({
         username: employee.username || "",
         first_name: employee.first_name || "",
@@ -135,34 +169,30 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
         gender: employee.gender || "",
         birth_date: employee.birth_date || "",
         marital_status: employee.marital_status || "",
-        current_address: employee.current_address_text || 
-                         (typeof employee.current_address === 'object' && employee.current_address ? 
-                          employee.current_address.line1 || employee.current_address.line2 || 
-                          employee.current_address.city || employee.current_address.state || 
-                          employee.current_address.country || employee.current_address.pincode || '' : 
-                          employee.current_address || ''),
-        permanent_address: employee.permanent_address_text || 
-                          (typeof employee.current_address === 'object' && employee.permanent_address ? 
-                           employee.permanent_address.line1 || employee.permanent_address.line2 || 
-                           employee.permanent_address.city || employee.permanent_address.state || 
-                           employee.permanent_address.country || employee.permanent_address.pincode || '' : 
-                           employee.permanent_address || ''),
-        document_link: employee.document_link || "",
-        account_holder: employee.account_holder || "",
-        account_number: employee.account_number || "",
-        ifsc_code: employee.ifsc_code || "",
-        branch: employee.branch || "",
+        current_address: currentAddressText,
+        permanent_address: permanentAddressText,
+        document_link: employee.employee_details?.document_link || employee.document_link || "",
+        account_holder: employee.employee_details?.bank_details?.account_holder || employee.account_holder || "",
+        account_number: employee.employee_details?.bank_details?.account_number || employee.account_number || "",
+        ifsc_code: employee.employee_details?.bank_details?.ifsc_code || employee.ifsc_code || "",
+        branch: employee.employee_details?.bank_details?.branch || employee.branch || "",
+        emergency_contact: employee.emergency_contact || "",
+        emergency_phone: employee.emergency_phone || "",
         profile_picture: null,
       })
       
-      setSelectedDesignations(employee.designations?.map((id: number) => id.toString()) || [])
-      setSelectedShifts(employee.shifts?.map((id: number) => id.toString()) || [])
-      setSelectedTechnologies(employee.technologies?.map((id: number) => id.toString()) || [])
+      const designationStrings = employee.designations?.map((id: number) => id.toString()) || []
+      const shiftStrings = employee.shifts?.map((id: number) => id.toString()) || []
+      const technologyStrings = employee.technologies?.map((id: number) => id.toString()) || []
+      
+      setSelectedDesignations(designationStrings)
+      setSelectedShifts(shiftStrings)
+      setSelectedTechnologies(technologyStrings)
       
       if (employee.joining_date) {
         setJoiningDate(new Date(employee.joining_date))
       }
-    } else {
+      } else {
       // Reset form for add mode
       setFormData({
         username: "",
@@ -194,6 +224,8 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
         account_number: "",
         ifsc_code: "",
         branch: "",
+        emergency_contact: "",
+        emergency_phone: "",
         profile_picture: null,
       })
       setSelectedDesignations([])
@@ -201,6 +233,9 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
       setSelectedTechnologies([])
       setJoiningDate(undefined)
     }
+    }
+    
+    loadEmployeeData()
   }, [employee, mode, isOpen])
 
 
@@ -276,6 +311,15 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
       
       if (formData.document_link) {
         formDataToSend.append('document_link', formData.document_link)
+      }
+      
+      // Add emergency contact fields
+      if (formData.emergency_contact) {
+        formDataToSend.append('emergency_contact', formData.emergency_contact)
+      }
+      
+      if (formData.emergency_phone) {
+        formDataToSend.append('emergency_phone', formData.emergency_phone)
       }
       
       // Add arrays
@@ -544,6 +588,29 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                           value={formData.permanent_address}
                           onChange={(e) => handleChange("permanent_address", e.target.value)}
                           rows={2}
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Emergency Contact</th>
+                      <td className="p-2 border">
+                        <Input
+                          id="emergency_contact"
+                          placeholder="Enter emergency contact name"
+                          className="h-9"
+                          value={formData.emergency_contact}
+                          onChange={(e) => handleChange("emergency_contact", e.target.value)}
+                        />
+                      </td>
+                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Emergency Phone</th>
+                      <td className="p-2 border">
+                        <Input
+                          id="emergency_phone"
+                          type="tel"
+                          placeholder="Enter emergency phone"
+                          className="h-9"
+                          value={formData.emergency_phone}
+                          onChange={(e) => handleChange("emergency_phone", e.target.value)}
                         />
                       </td>
                     </tr>
