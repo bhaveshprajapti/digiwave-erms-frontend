@@ -819,13 +819,12 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                       </td>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Last Working Date</th>
                       <td className="p-2 border">
-                        <Input
-                          id="notice_period_end_date"
-                          type="date"
-                          className="h-9"
+                        <DatePicker
+                          value={formData.notice_period_end_date ? new Date(formData.notice_period_end_date) : undefined}
+                          onChange={(date: Date | undefined) => {
+                            handleChange("notice_period_end_date", date?.toISOString().split('T')[0] || "")
+                          }}
                           disabled={!formData.is_on_notice_period}
-                          value={formData.notice_period_end_date}
-                          onChange={(e) => handleChange("notice_period_end_date", e.target.value)}
                         />
                       </td>
                     </tr>

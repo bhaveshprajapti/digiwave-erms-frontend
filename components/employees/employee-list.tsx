@@ -14,6 +14,7 @@ import { EmployeeModal } from "./employee-modal"
 
 import { useEmployees } from "@/hooks/use-employees"
 import { useEmployeeTypes, useDesignations } from "@/hooks/use-common"
+import { useCurrentUser } from "@/hooks/use-current-user"
 
 interface EmployeeListItem {
   id: string
@@ -25,6 +26,7 @@ interface EmployeeListItem {
   employee_type: number
   designations: number[]
   is_active: boolean
+  is_superuser?: boolean
   joining_date: string | null
   gender?: string | null
   birth_date?: string | null
@@ -56,6 +58,7 @@ export function EmployeeList() {
   const { employees, isLoading, error, mutate } = useEmployees()
   const { employeeTypes, isLoading: loadingTypes } = useEmployeeTypes()
   const { designations, isLoading: loadingDesignations } = useDesignations()
+  const { currentUser, isLoading: loadingCurrentUser } = useCurrentUser()
   const { toast } = useToast()
 
   const filteredEmployees = employees?.map(emp => {
@@ -75,6 +78,7 @@ export function EmployeeList() {
       designations: Array.isArray(safeEmp.designations) ? safeEmp.designations :
                    safeEmp.designation ? [typeof safeEmp.designation === 'number' ? safeEmp.designation : safeEmp.designation?.id].filter(Boolean) : [],
       is_active: Boolean(safeEmp.is_active),
+      is_superuser: Boolean(safeEmp.is_superuser),
       joining_date: safeEmp.joining_date || null,
       gender: safeEmp.gender || null,
       birth_date: safeEmp.birth_date || null,
@@ -85,9 +89,10 @@ export function EmployeeList() {
     };
   })?.filter(
     (emp) =>
-      `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (currentUser?.id !== emp.id && !emp.is_superuser) &&
+      (`${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
       emp.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.username.toLowerCase().includes(searchQuery.toLowerCase()),
+      emp.username.toLowerCase().includes(searchQuery.toLowerCase())),
   ) || []
 
   const handleAddEmployee = () => {
@@ -101,13 +106,12 @@ export function EmployeeList() {
     setSelectedEmployee(employee)
     setIsModalOpen(true)
   }
-
   const handleRefresh = () => {
     // Use SWR's mutate to refresh the data without full page reload
     mutate()
   }
 
-  const handleDeleteEmployee = async (employee: EmployeeListItem) => {
+  const handleDeleteEmployee = (employee: EmployeeListItem) => {
     setEmployeeToDelete(employee)
   }
 
@@ -139,7 +143,7 @@ export function EmployeeList() {
   }
 
 
-  if (isLoading || loadingTypes || loadingDesignations) {
+  if (isLoading || loadingTypes || loadingDesignations || loadingCurrentUser) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center min-h-[400px]">
@@ -278,15 +282,17 @@ export function EmployeeList() {
                         >
                           <Edit className="h-4 w-4 text-yellow-600" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteEmployee(employee)}
-                          className="h-8 w-8 p-0 hover:bg-red-100"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
+                        {currentUser?.id !== employee.id && !employee.is_superuser && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteEmployee(employee)}
+                            className="h-8 w-8 p-0 hover:bg-red-100"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
+                        )}
                         
                         {getEmployeeTypeName(employee.employee_type).toLowerCase() === 'fixed' && (
                           <Button

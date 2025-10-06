@@ -264,11 +264,11 @@ export function EmployeeForm() {
               </div>
               <div>
                 <Label htmlFor="birth_date">Birth Date</Label>
-                <Input
-                  id="birth_date"
-                  type="date"
-                  value={formData.birth_date}
-                  onChange={(e) => handleChange("birth_date", e.target.value)}
+                <DatePicker
+                  value={formData.birth_date ? new Date(formData.birth_date) : undefined}
+                  onChange={(date: Date | undefined) => {
+                    handleChange("birth_date", date?.toISOString().split('T')[0] || "")
+                  }}
                 />
               </div>
             </div>
@@ -577,12 +577,11 @@ export function EmployeeForm() {
               {formData.is_on_notice_period && (
                 <div className="ml-8">
                   <Label htmlFor="notice_period_end_date">Notice Period End Date</Label>
-                  <Input
-                    id="notice_period_end_date"
-                    type="date"
-                    value={formData.notice_period_end_date}
-                    onChange={(e) => handleChange("notice_period_end_date", e.target.value)}
-                    className="mt-1"
+                  <DatePicker
+                    value={formData.notice_period_end_date ? new Date(formData.notice_period_end_date) : undefined}
+                    onChange={(date: Date | undefined) => {
+                      handleChange("notice_period_end_date", date?.toISOString().split('T')[0] || "")
+                    }}
                   />
                 </div>
               )}
