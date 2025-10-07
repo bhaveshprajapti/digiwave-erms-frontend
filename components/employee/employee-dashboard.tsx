@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -16,8 +17,10 @@ import {
   Eye,
   TrendingUp
 } from "lucide-react"
+import authService from "@/lib/auth"
 
 export function EmployeeDashboard() {
+  const router = useRouter()
   const [user, setUser] = useState<any>(null)
   const [stats, setStats] = useState({
     pendingRequests: 2,
@@ -27,9 +30,9 @@ export function EmployeeDashboard() {
   })
 
   useEffect(() => {
-    const userData = localStorage.getItem("user")
-    if (userData) {
-      setUser(JSON.parse(userData))
+    const u = authService.getUserData()
+    if (u) {
+      setUser(u)
     }
   }, [])
 
@@ -209,7 +212,7 @@ export function EmployeeDashboard() {
                   key={action.title}
                   variant="outline"
                   className="h-auto p-4 flex flex-col items-center space-y-2 hover:shadow-md transition-shadow"
-                  onClick={() => window.location.href = action.href}
+                  onClick={() => router.push(action.href)}
                 >
                   <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
                     action.color === 'blue' ? 'bg-blue-100 text-blue-600' :

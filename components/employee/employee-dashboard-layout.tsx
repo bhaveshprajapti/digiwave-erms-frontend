@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -17,6 +18,7 @@ import {
   Clock,
   Bell
 } from "lucide-react"
+import authService from "@/lib/auth"
 
 interface EmployeeDashboardLayoutProps {
   children: React.ReactNode
@@ -26,15 +28,14 @@ export function EmployeeDashboardLayout({ children }: EmployeeDashboardLayoutPro
   const [user, setUser] = useState<any>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
-    const userData = localStorage.getItem("user")
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      
+    const u = authService.getUserData()
+    if (u) {
+      setUser(u)
       // Check if user is actually an employee (not admin/superuser)
-      if (parsedUser.is_superuser || parsedUser.is_staff) {
+      if (u.is_superuser || u.is_staff) {
         router.push("/dashboard") // Redirect admins to admin dashboard
         return
       }
@@ -44,9 +45,7 @@ export function EmployeeDashboardLayout({ children }: EmployeeDashboardLayoutPro
   }, [router])
 
   const handleLogout = () => {
-    localStorage.removeItem("user")
-    localStorage.removeItem("authToken")
-    router.push("/login")
+    authService.logout()
   }
 
   const navigation = [
@@ -54,25 +53,21 @@ export function EmployeeDashboardLayout({ children }: EmployeeDashboardLayoutPro
       name: "Dashboard",
       href: "/employee-dashboard",
       icon: Home,
-      current: true
     },
     {
       name: "My Profile",
       href: "/employee-dashboard/profile",
       icon: User,
-      current: false
     },
     {
       name: "My Requests",
       href: "/employee-dashboard/requests",
       icon: FileText,
-      current: false
     },
     {
       name: "Time Tracking",
       href: "/employee-dashboard/time",
       icon: Clock,
-      current: false
     }
   ]
 
@@ -139,21 +134,23 @@ export function EmployeeDashboardLayout({ children }: EmployeeDashboardLayoutPro
         <nav className="flex-1 px-4 py-6 space-y-2">
           {navigation.map((item) => {
             const Icon = item.icon
+            const isActive = pathname === item.href || (item.href !== '/employee-dashboard' && pathname?.startsWith(item.href))
             return (
-              <a
+              <Link
                 key={item.name}
                 href={item.href}
+                onClick={() => setSidebarOpen(false)}
                 className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  item.current
-                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700'
+                  isActive
+                    ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600'
                     : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >
                 <Icon className={`mr-3 h-5 w-5 ${
-                  item.current ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'
+                  isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'
                 }`} />
                 {item.name}
-              </a>
+              </Link>
             )
           })}
         </nav>
@@ -185,7 +182,9 @@ export function EmployeeDashboardLayout({ children }: EmployeeDashboardLayoutPro
               >
                 <Menu className="h-5 w-5" />
               </Button>
-              <h1 className="text-xl font-semibold text-gray-900">Employee Dashboard</h1>
+              <h1 className="text-xl font-semibold text-gray-900">
+                {pathname === '/employee-dashboard' ? 'Employee Dashboard' : 'Employee Portal'}
+              </h1>
             </div>
             
             <div className="flex items-center space-x-4">

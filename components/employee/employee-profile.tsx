@@ -24,13 +24,16 @@ import {
   Clock
 } from "lucide-react"
 import api from "@/lib/api"
+import authService from "@/lib/auth"
 
 interface ProfileUpdateRequest {
-  field: string
+  field?: string
+  field_name?: string
   old_value: string
   new_value: string
   status: 'pending' | 'approved' | 'rejected'
   requested_at: string
+  document_link?: string
 }
 
 export function EmployeeProfile() {
@@ -55,6 +58,8 @@ export function EmployeeProfile() {
     emergency_phone: "",
   })
 
+  const [requestDocumentLink, setRequestDocumentLink] = useState("")
+
   useEffect(() => {
     loadUserProfile()
     loadPendingRequests()
@@ -62,12 +67,10 @@ export function EmployeeProfile() {
 
   const loadUserProfile = async () => {
     try {
-      const userData = localStorage.getItem("user")
-      if (userData) {
-        const parsedUser = JSON.parse(userData)
-        
+      const u = authService.getUserData()
+      if (u) {
         // Fetch complete user details
-        const response = await api.get(`/accounts/users/${parsedUser.id}/`)
+        const response = await api.get(`/accounts/users/${u.id}/`)
         const fullUser = response.data
         
         setUser(fullUser)
@@ -110,7 +113,12 @@ export function EmployeeProfile() {
   const loadPendingRequests = async () => {
     try {
       const response = await api.get('/accounts/profile-update-requests/my_requests/')
-      setPendingRequests(response.data)
+      const data = Array.isArray(response.data) ? response.data : []
+      const normalized = data.map((item: any) => ({
+        ...item,
+        field: item.field ?? item.field_name ?? ''
+      }))
+      setPendingRequests(normalized)
     } catch (error) {
       console.error("Error loading pending requests:", error)
       // Fallback to empty array
@@ -156,7 +164,8 @@ export function EmployeeProfile() {
           field_name: change.field,
           old_value: change.old_value,
           new_value: change.new_value,
-          reason: `Update ${change.field.replace('_', ' ')}`
+          reason: `Update ${change.field.replace('_', ' ')}`,
+          document_link: requestDocumentLink || undefined
         })
       )
       
@@ -168,6 +177,7 @@ export function EmployeeProfile() {
       })
       
       setEditMode(false)
+      setRequestDocumentLink("")
       loadPendingRequests() // Reload pending requests
       
     } catch (error) {
@@ -223,6 +233,7 @@ export function EmployeeProfile() {
                 variant="outline" 
                 onClick={() => {
                   setEditMode(false)
+                  setRequestDocumentLink("")
                   loadUserProfile() // Reset form data
                 }}
               >
@@ -271,6 +282,28 @@ export function EmployeeProfile() {
         </TabsList>
 
         <TabsContent value="profile" className="space-y-6">
+          {editMode && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <span>Update Request</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Label htmlFor="document_link">Document link (optional)</Label>
+                  <Input
+                    id="document_link"
+                    type="url"
+                    placeholder="https://..."
+                    value={requestDocumentLink}
+                    onChange={(e) => setRequestDocumentLink(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-500">Include a URL to supporting documentation for your update request.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {/* Profile Picture & Basic Info */}
           <Card>
             <CardHeader>
@@ -499,11 +532,24 @@ export function EmployeeProfile() {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium capitalize">
-                            {request.field.replace('_', ' ')} Update
+                            {(request.field?.replace?.('_', ' ') || request.field_name?.replace?.('_', ' ') || 'Field')} Update
                           </p>
                           <div className="text-sm text-gray-600 mt-1">
                             <p><span className="font-medium">From:</span> {request.old_value}</p>
                             <p><span className="font-medium">To:</span> {request.new_value}</p>
+                            {request.document_link && (
+                              <p>
+                                <span className="font-medium">Document:</span>{' '}
+                                <a
+                                  href={request.document_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 underline"
+                                >
+                                  {request.document_link}
+                                </a>
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">

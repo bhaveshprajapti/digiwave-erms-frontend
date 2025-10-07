@@ -43,6 +43,7 @@ export function ProfileRequestsManagement() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedRequest, setSelectedRequest] = useState<ProfileUpdateRequest | null>(null)
+  const [selectedUser, setSelectedUser] = useState<{ user_id: number; user_name: string; user_email: string } | null>(null)
   const [adminComment, setAdminComment] = useState("")
   const [processing, setProcessing] = useState(false)
   const { toast } = useToast()
@@ -95,19 +96,10 @@ export function ProfileRequestsManagement() {
   }
 
   const handleReject = async (requestId: number) => {
-    if (!adminComment.trim()) {
-      toast({
-        title: "Comment Required",
-        description: "Please provide a reason for rejection",
-        variant: "destructive",
-      })
-      return
-    }
-
     setProcessing(true)
     try {
       await api.post(`/accounts/profile-update-requests/${requestId}/reject/`, {
-        admin_comment: adminComment
+        admin_comment: adminComment && adminComment.trim().length > 0 ? adminComment : 'Request rejected'
       })
       
       toast({
@@ -118,11 +110,12 @@ export function ProfileRequestsManagement() {
       loadRequests() // Refresh the list
       setSelectedRequest(null)
       setAdminComment("")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error rejecting request:", error)
+      const description = error?.response?.data?.error || "Failed to reject the request"
       toast({
         title: "Error",
-        description: "Failed to reject the request",
+        description,
         variant: "destructive",
       })
     } finally {
@@ -140,6 +133,29 @@ export function ProfileRequestsManagement() {
     
     return matchesSearch && matchesStatus
   })
+
+  // Group by user for the master table
+  const groupedByUser = Object.values(
+    filteredRequests.reduce((acc: any, req) => {
+      const key = req.user_name + '|' + req.user_email + '|' + req.user
+      if (!acc[key]) {
+        acc[key] = {
+          user_id: req.user,
+          user_name: req.user_name,
+          user_email: req.user_email,
+          total: 0,
+          pending: 0,
+          approved: 0,
+          rejected: 0,
+          latest: req.requested_at,
+        }
+      }
+      acc[key].total += 1
+      acc[key][req.status] += 1
+      if (new Date(req.requested_at) > new Date(acc[key].latest)) acc[key].latest = req.requested_at
+      return acc
+    }, {})
+  ) as Array<{ user_id: number; user_name: string; user_email: string; total: number; pending: number; approved: number; rejected: number; latest: string }>
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -222,16 +238,16 @@ export function ProfileRequestsManagement() {
         </CardContent>
       </Card>
 
-      {/* Requests Table */}
+      {/* Grouped by User Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <User className="h-5 w-5" />
-            <span>Profile Update Requests ({filteredRequests.length})</span>
+            <span>Profile Update Requests by Employee ({groupedByUser.length})</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredRequests.length === 0 ? (
+          {groupedByUser.length === 0 ? (
             <div className="text-center py-8">
               <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <p className="text-gray-500">No profile update requests found</p>
@@ -241,179 +257,127 @@ export function ProfileRequestsManagement() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Employee</TableHead>
-                  <TableHead>Field</TableHead>
-                  <TableHead>Changes</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Requested</TableHead>
+                  <TableHead>Totals</TableHead>
+                  <TableHead>Latest Request</TableHead>
                   <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRequests.map((request) => (
-                  <TableRow key={request.id}>
+                {groupedByUser.map((u) => (
+                  <TableRow key={u.user_id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{request.user_name}</p>
-                        <p className="text-sm text-gray-500">{request.user_email}</p>
+                        <p className="font-medium">{u.user_name}</p>
+                        <p className="text-sm text-gray-500">{u.user_email}</p>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                        {formatFieldName(request.field_name)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="max-w-xs">
-                        <p className="text-sm">
-                          <span className="font-medium">From:</span> {request.old_value || 'Empty'}
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-medium">To:</span> {request.new_value}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Total {u.total}</Badge>
+                        <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Pending {u.pending}</Badge>
+                        <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Approved {u.approved}</Badge>
+                        <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">Rejected {u.rejected}</Badge>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(request.status)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-1 text-sm text-gray-500">
                         <Calendar className="h-3 w-3" />
-                        <span>{new Date(request.requested_at).toLocaleDateString()}</span>
+                        <span>{new Date(u.latest).toLocaleDateString()}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center justify-center space-x-2">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                setSelectedRequest(request)
-                                setAdminComment(request.admin_comment || "")
-                              }}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-2xl">
-                            <DialogHeader>
-                              <DialogTitle>Profile Update Request Details</DialogTitle>
-                            </DialogHeader>
-                            {selectedRequest && (
-                              <div className="space-y-6">
-                                {/* Employee Info */}
-                                <div className="bg-gray-50 p-4 rounded-lg">
-                                  <h3 className="font-medium mb-2">Employee Information</h3>
-                                  <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div>
-                                      <span className="font-medium">Name:</span> {selectedRequest.user_name}
-                                    </div>
-                                    <div>
-                                      <span className="font-medium">Email:</span> {selectedRequest.user_email}
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Change Details */}
-                                <div>
-                                  <h3 className="font-medium mb-2">Requested Change</h3>
-                                  <div className="space-y-2">
-                                    <div>
-                                      <Label>Field: {formatFieldName(selectedRequest.field_name)}</Label>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div>
-                                        <Label className="text-red-600">Current Value</Label>
-                                        <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
-                                          {selectedRequest.old_value || 'Empty'}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedUser({ user_id: u.user_id, user_name: u.user_name, user_email: u.user_email })
+                              setAdminComment("")
+                            }}
+                          >
+                            View Requests
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-3xl">
+                          <DialogHeader>
+                            <DialogTitle>Requests for {selectedUser?.user_name}</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            {filteredRequests.filter(r => r.user === selectedUser?.user_id).length === 0 ? (
+                              <div className="text-center py-8 text-gray-500">No requests for this user.</div>
+                            ) : (
+                              filteredRequests
+                                .filter(r => r.user === selectedUser?.user_id)
+                                .map((request) => (
+                                  <div key={request.id} className="border rounded-lg p-4">
+                                    <div className="flex items-start justify-between">
+                                      <div className="space-y-2 w-full">
+                                        <div className="flex items-center gap-2">
+                                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                            {formatFieldName(request.field_name)}
+                                          </Badge>
+                                          {getStatusBadge(request.status)}
                                         </div>
-                                      </div>
-                                      <div>
-                                        <Label className="text-green-600">New Value</Label>
-                                        <div className="p-2 bg-green-50 border border-green-200 rounded text-sm">
-                                          {selectedRequest.new_value}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                          <div>
+                                            <Label className="text-red-600">Current Value</Label>
+                                            <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
+                                              {request.old_value || 'Empty'}
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <Label className="text-green-600">New Value</Label>
+                                            <div className="p-2 bg-green-50 border border-green-200 rounded text-sm">
+                                              {request.new_value}
+                                            </div>
+                                          </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                    {selectedRequest.reason && (
-                                      <div>
-                                        <Label>Reason</Label>
-                                        <div className="p-2 bg-gray-50 border rounded text-sm">
-                                          {selectedRequest.reason}
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Admin Comment */}
-                                <div>
-                                  <Label htmlFor="admin_comment">Admin Comment</Label>
-                                  <Textarea
-                                    id="admin_comment"
-                                    value={adminComment}
-                                    onChange={(e) => setAdminComment(e.target.value)}
-                                    placeholder="Add your comment (required for rejection)"
-                                    className="mt-1"
-                                  />
-                                </div>
-
-                                {/* Actions */}
-                                {selectedRequest.status === 'pending' && (
-                                  <div className="flex items-center justify-end space-x-2 pt-4 border-t">
-                                    <Button
-                                      variant="outline"
-                                      onClick={() => handleReject(selectedRequest.id)}
-                                      disabled={processing}
-                                      className="text-red-600 border-red-200 hover:bg-red-50"
-                                    >
-                                      <XCircle className="h-4 w-4 mr-2" />
-                                      Reject
-                                    </Button>
-                                    <Button
-                                      onClick={() => handleApprove(selectedRequest.id)}
-                                      disabled={processing}
-                                      className="bg-green-600 hover:bg-green-700"
-                                    >
-                                      <CheckCircle className="h-4 w-4 mr-2" />
-                                      Approve
-                                    </Button>
-                                  </div>
-                                )}
-
-                                {selectedRequest.status !== 'pending' && (
-                                  <div className="bg-gray-50 p-4 rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                      <div>
-                                        <p className="font-medium">Status: {getStatusBadge(selectedRequest.status)}</p>
-                                        {selectedRequest.processed_at && (
-                                          <p className="text-sm text-gray-500">
-                                            Processed on {new Date(selectedRequest.processed_at).toLocaleString()}
-                                          </p>
+                                        {request.reason && (
+                                          <div>
+                                            <Label>Reason</Label>
+                                            <div className="p-2 bg-gray-50 border rounded text-sm">
+                                              {request.reason}
+                                            </div>
+                                          </div>
                                         )}
-                                        {selectedRequest.approved_by_name && (
-                                          <p className="text-sm text-gray-500">
-                                            By: {selectedRequest.approved_by_name}
-                                          </p>
+                                        {request.status === 'pending' && (
+                                          <div className="flex flex-col md:flex-row md:items-center gap-2 md:justify-end pt-2">
+                                            <Textarea
+                                              value={adminComment}
+                                              onChange={(e) => setAdminComment(e.target.value)}
+                                              placeholder="Admin comment (optional)"
+                                              className="md:max-w-sm"
+                                            />
+                                            <div className="flex items-center gap-2">
+                                              <Button
+                                                variant="outline"
+                                                onClick={() => handleReject(request.id)}
+                                                disabled={processing}
+                                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                              >
+                                                <XCircle className="h-4 w-4 mr-2" />
+                                                Reject
+                                              </Button>
+                                              <Button
+                                                onClick={() => handleApprove(request.id)}
+                                                disabled={processing}
+                                                className="bg-green-600 hover:bg-green-700"
+                                              >
+                                                <CheckCircle className="h-4 w-4 mr-2" />
+                                                Approve
+                                              </Button>
+                                            </div>
+                                          </div>
                                         )}
                                       </div>
                                     </div>
-                                    {selectedRequest.admin_comment && (
-                                      <div className="mt-2">
-                                        <Label>Admin Comment</Label>
-                                        <div className="p-2 bg-white border rounded text-sm">
-                                          {selectedRequest.admin_comment}
-                                        </div>
-                                      </div>
-                                    )}
                                   </div>
-                                )}
-                              </div>
+                                ))
                             )}
-                          </DialogContent>
-                        </Dialog>
-                      </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                     </TableCell>
                   </TableRow>
                 ))}
