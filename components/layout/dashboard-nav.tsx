@@ -5,109 +5,13 @@ import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import {
-  LayoutDashboard,
-  Users,
-  Calendar,
-  Clock,
-  FolderKanban,
-  UserCircle,
-  FileText,
-  DollarSign,
   Building2,
-  Shield,
-  FileBarChart,
-  CheckSquare,
   ChevronDown,
   ChevronRight,
-  Server,
-  FolderOpen,
-  Plus,
-  Megaphone,
-  CreditCard,
-  BarChart3,
-  Settings,
-  CalendarDays,
-  Briefcase,
-  Globe,
-  UserPlus,
-  Bell,
-  DollarSign as PaymentIcon,
 } from "lucide-react"
 
-// Navigation structure with collapsible sections
-const navigationSections = [
-  {
-    title: "DASHBOARD",
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    ]
-  },
-  {
-    title: "DATA",
-    items: [
-      {
-        label: "Projects",
-        icon: FolderKanban,
-        children: [
-          { href: "/dashboard/projects", label: "All Projects" },
-          { href: "/dashboard/quotations", label: "Quotations" },
-          { href: "/dashboard/projects/profit-loss", label: "Project P & L" },
-        ]
-      },
-      {
-        label: "Server & Domain",
-        icon: Server,
-        children: [
-          { href: "/dashboard/servers", label: "Server Details" },
-          { href: "/dashboard/domains", label: "Domain Details" },
-        ]
-      },
-      { href: "/dashboard/files", label: "Files & Docs", icon: FolderOpen },
-      {
-        label: "Add Data",
-        icon: Plus,
-        children: [
-          { href: "/dashboard/settings/roles", label: "Roles & Permission" },
-          { href: "/dashboard/settings/employee-types", label: "Employee Type" },
-          { href: "/dashboard/settings/designations", label: "Designations" },
-          { href: "/dashboard/settings/shifts", label: "Shifts" },
-          { href: "/dashboard/settings/technologies", label: "Technologies" },
-          { href: "/dashboard/settings/apps-services", label: "Apps & Service" },
-          { href: "/dashboard/settings/holidays", label: "Public Holidays" },
-        ]
-      },
-    ]
-  },
-  {
-    title: "USERS",
-    items: [
-      {
-        label: "Employees",
-        icon: Users,
-        children: [
-          { href: "/dashboard/employees", label: "All Employees" },
-          { href: "/dashboard/leave", label: "Leave Management" },
-          { href: "/dashboard/attendance", label: "Attendance" },
-          { href: "/dashboard/admin/policies", label: "Leave Policies" },
-        ]
-      },
-      { href: "/dashboard/clients", label: "Client", icon: UserCircle },
-      { href: "/dashboard/announcements", label: "Announcement & Notice", icon: Megaphone },
-    ]
-  },
-  {
-    title: "PAYMENTS",
-    items: [
-      { href: "/dashboard/payments/from-client", label: "From Client", icon: PaymentIcon },
-    ]
-  },
-  {
-    title: "REPORTS",
-    items: [
-      { href: "/dashboard/admin/audit", label: "Audit Logs", icon: FileBarChart },
-    ]
-  },
-]
+// Navigation structure imported to keep mobile and desktop in sync
+import { navigationSections } from "@/components/layout/navigation"
 
 // Navigation item component for items with children
 function NavItem({ item, pathname, level = 0 }: { item: any, pathname: string, level?: number }) {
