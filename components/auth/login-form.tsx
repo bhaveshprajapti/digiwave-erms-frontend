@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Building2 } from "lucide-react"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/api" // Import the new api instance
 
 export function LoginForm() {
@@ -17,10 +17,12 @@ export function LoginForm() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+    setError("") // Clear any previous errors
 
     try {
       const resp = await api.post("/accounts/login", {
@@ -55,24 +57,58 @@ export function LoginForm() {
       }
     } catch (err: any) {
       let errorMessage = "An unexpected error occurred."
+      let errorTitle = "Login Failed"
+      
       if (err.response) {
         // The request was made and the server responded with a status code
         // that falls out of the range of 2xx
         const errorData = err.response.data
-        errorMessage = errorData.non_field_errors?.[0] || "Invalid credentials."
+        const statusCode = err.response.status
+        
+        if (statusCode === 400) {
+          // Bad request - usually invalid credentials
+          if (errorData.non_field_errors?.[0]) {
+            errorMessage = errorData.non_field_errors[0]
+          } else if (errorData.username) {
+            errorMessage = Array.isArray(errorData.username) ? errorData.username[0] : errorData.username
+          } else if (errorData.password) {
+            errorMessage = Array.isArray(errorData.password) ? errorData.password[0] : errorData.password
+          } else {
+            errorMessage = "Invalid username or password. Please check your credentials and try again."
+          }
+        } else if (statusCode === 401) {
+          errorMessage = "Authentication failed. Please check your credentials."
+        } else if (statusCode === 403) {
+          errorMessage = "Access denied. Your account may be inactive or suspended."
+        } else if (statusCode === 404) {
+          errorMessage = "User account not found. Please check your username or contact support."
+        } else if (statusCode >= 500) {
+          errorMessage = "Server error. Please try again later or contact support."
+          errorTitle = "Server Error"
+        } else {
+          errorMessage = errorData.detail || errorData.message || "Login failed. Please try again."
+        }
       } else if (err.request) {
         // The request was made but no response was received
-        errorMessage = "No response from server. Please check your connection."
+        errorMessage = "Unable to connect to server. Please check your internet connection and try again."
+        errorTitle = "Connection Error"
       } else {
         // Something happened in setting up the request that triggered an Error
-        errorMessage = err.message
+        errorMessage = err.message || "An unexpected error occurred while logging in."
       }
 
+      // Set error state for form display
+      setError(errorMessage)
+      
+      // Show the toast with the error
       toast({
         variant: "destructive",
-        title: "Login Failed",
+        title: errorTitle,
         description: errorMessage,
       })
+      
+      // Log the full error for debugging
+      console.error('Login error:', err)
     } finally {
       setLoading(false)
     }
@@ -98,6 +134,7 @@ export function LoginForm() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
+              className={error ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
           </div>
           <div className="space-y-2">
@@ -108,8 +145,14 @@ export function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              className={error ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
           </div>
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+              {error}
+            </div>
+          )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
           </Button>
