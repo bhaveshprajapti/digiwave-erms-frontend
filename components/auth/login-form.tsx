@@ -20,6 +20,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   // Load remembered credentials on component mount
   useEffect(() => {
@@ -119,11 +120,11 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-3 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-          <Building2 className="h-6 w-6 text-primary-foreground" />
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-transparent">
+          <img src="/digiwave-logo.png" alt="Digiwave" className="h-12 w-12" />
         </div>
-        <CardTitle className="text-2xl">Employee Resource Management</CardTitle>
-        <CardDescription>Sign in to access your workspace</CardDescription>
+        <CardTitle className="text-2xl">Digiwave</CardTitle>
+        <CardDescription>Sign in to your Digiwave workspace</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -141,29 +142,47 @@ export function LoginForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className={error ? "border-red-500 focus-visible:ring-red-500" : ""}
-            />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className={error ? "border-red-500 focus-visible:ring-red-500 pr-9" : "pr-9"}
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                onClick={() => setShowPassword(s => !s)}
+                className="absolute inset-y-0 right-0 px-3 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5"><path d="M3.53 2.47a.75.75 0 0 0-1.06 1.06l18 18a.75.75 0 1 0 1.06-1.06l-2.28-2.28a12.73 12.73 0 0 0 3.2-4.65.75.75 0 0 0 0-.56C20.92 7.07 16.7 4.5 12 4.5c-1.64 0-3.2.33-4.62.95L3.53 2.47ZM12 6c3.9 0 7.59 2.18 9.94 6-1.04 1.73-2.36 3.1-3.87 4.07l-2.03-2.03a4.5 4.5 0 0 0-6.08-6.08L7.9 6.9C9.2 6.32 10.57 6 12 6Zm0 12a9.72 9.72 0 0 0 3.53-.65l-1.67-1.67a4.5 4.5 0 0 1-6.54-6.54L5.4 7.71C3.5 8.96 1.91 10.68 1.06 12c1.95 3.22 6.17 6 10.94 6Z"/></svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5"><path d="M12 5c-5 0-9 3.5-10.94 7 1.94 3.5 5.94 7 10.94 7s9-3.5 10.94-7C21 8.5 17 5 12 5Zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></svg>
+                )}
+              </button>
+            </div>
           </div>
           
-          {/* Remember Me Checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="remember-me"
-              checked={rememberMe}
-              onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-            />
-            <Label
-              htmlFor="remember-me"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Remember me
-            </Label>
+          {/* Remember Me & Forgot Password */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="remember-me"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              />
+              <Label
+                htmlFor="remember-me"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              >
+                Remember me
+              </Label>
+            </div>
+            {/* Forgot password temporarily disabled */}
+            {/* <a href="/forgot-password" className="text-sm text-primary hover:underline">Forgot password?</a> */}
           </div>
           
           {error && (

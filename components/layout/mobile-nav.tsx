@@ -17,12 +17,26 @@ import {
 import { navigationSections } from "@/components/layout/navigation"
 
 // Mobile navigation item component
+function normalizePath(p?: string) {
+  if (!p) return ''
+  if (p.length > 1 && p.endsWith('/')) return p.replace(/\/+$/, '')
+  return p
+}
+function isPathActive(pathname: string, href?: string) {
+  if (!href) return false
+  const path = normalizePath(pathname)
+  const target = normalizePath(href)
+  const segs = target.split('/').filter(Boolean).length
+  if (segs <= 1) return path === target
+  return path === target || path.startsWith(target + "/")
+}
+
 function MobileNavItem({ item, pathname, onClose, level = 0 }: { item: any, pathname: string, onClose: () => void, level?: number }) {
-  const [isOpen, setIsOpen] = useState(false)
   const hasChildren = item.children && item.children.length > 0
   const Icon = item.icon
-  const isActive = pathname === item.href
-  const hasActiveChild = hasChildren && item.children.some((child: any) => pathname === child.href)
+  const isActive = isPathActive(pathname, item.href)
+  const hasActiveChild = hasChildren && item.children.some((child: any) => isPathActive(pathname, child.href))
+  const [isOpen, setIsOpen] = useState(hasActiveChild)
 
   if (hasChildren) {
     return (
@@ -31,8 +45,8 @@ function MobileNavItem({ item, pathname, onClose, level = 0 }: { item: any, path
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            hasActiveChild
-              ? "bg-primary/10 text-primary"
+hasActiveChild
+              ? "bg-muted text-foreground"
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
             level > 0 && "ml-4"
           )}
@@ -50,8 +64,8 @@ function MobileNavItem({ item, pathname, onClose, level = 0 }: { item: any, path
                 onClick={onClose}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  pathname === child.href
-                    ? "bg-primary text-primary-foreground"
+isPathActive(pathname, child.href)
+                    ? "bg-muted text-foreground"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
@@ -71,8 +85,8 @@ function MobileNavItem({ item, pathname, onClose, level = 0 }: { item: any, path
       onClick={onClose}
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-        isActive
-          ? "bg-primary text-primary-foreground"
+isActive
+          ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
         level > 0 && "ml-4"
       )}

@@ -5,10 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Search, MoreVertical, Eye, Edit, Trash2, FileText } from "lucide-react"
+import { Search, Eye, Edit, Trash2, FileText, MoreHorizontal } from "lucide-react"
 import Link from "next/link"
+import { DataTable } from "@/components/common/data-table"
+import { ActionButtons } from "@/components/common/action-buttons"
 
 const mockClients = [
   {
@@ -97,74 +97,42 @@ export function ClientList() {
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Client</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Projects</TableHead>
-              <TableHead>Revenue</TableHead>
-              <TableHead>Last Contact</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredClients.map((client) => (
-              <TableRow key={client.id}>
-                <TableCell>
-                  <div>
-                    <div className="font-medium">{client.name}</div>
-                    <div className="text-sm text-muted-foreground">{client.company}</div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm">
-                    <div>{client.email}</div>
-                    <div className="text-muted-foreground">{client.phone}</div>
-                  </div>
-                </TableCell>
-                <TableCell>{client.projects}</TableCell>
-                <TableCell className="font-medium">${client.totalRevenue.toLocaleString()}</TableCell>
-                <TableCell>{new Date(client.lastContact).toLocaleDateString()}</TableCell>
-                <TableCell>{getStatusBadge(client.status)}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/clients/${client.id}`}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/quotations/new?client=${client.id}`}>
-                          <FileText className="mr-2 h-4 w-4" />
-                          Create Quote
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/dashboard/clients/${client.id}/edit`}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        <DataTable<typeof filteredClients[0]>
+          columns={[
+            { key: 'client', header: 'Client', sortable: true, sortAccessor: (c:any)=>c.name, cell: (client:any) => (
+              <div>
+                <div className="font-medium">{client.name}</div>
+                <div className="text-sm text-muted-foreground">{client.company}</div>
+              </div>
+            )},
+            { key: 'contact', header: 'Contact', cell: (client:any) => (
+              <div className="text-sm">
+                <div>{client.email}</div>
+                <div className="text-muted-foreground">{client.phone}</div>
+              </div>
+            )},
+            { key: 'projects', header: 'Projects', sortable: true },
+            { key: 'revenue', header: 'Revenue', sortable: true, sortAccessor: (c:any)=>c.totalRevenue, cell: (c:any)=> <span className="font-medium">${c.totalRevenue.toLocaleString()}</span> },
+            { key: 'last', header: 'Last Contact', sortable: true, sortAccessor: (c:any)=>new Date(c.lastContact).getTime(), cell: (c:any)=> new Date(c.lastContact).toLocaleDateString() },
+            { key: 'status', header: 'Status', cell: (c:any)=> getStatusBadge(c.status) },
+            { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (client:any) => (
+              <div className="flex items-center justify-center">
+                <ActionButtons
+                  extras={[
+                    { title: 'View Details', onClick: () => window.location.href = `/dashboard/clients/${client.id}`, icon: <Eye className="h-4 w-4" />},
+                    { title: 'Create Quote', onClick: () => window.location.href = `/dashboard/quotations/new?client=${client.id}`, icon: <FileText className="h-4 w-4" />},
+                    { title: 'Edit', onClick: () => window.location.href = `/dashboard/clients/${client.id}/edit`, icon: <Edit className="h-4 w-4" />},
+                    { title: 'Delete', onClick: () => {}, className: 'hover:bg-red-100', icon: <Trash2 className="h-4 w-4 text-red-600" />},
+                  ]}
+                />
+              </div>
+            )}
+          ]}
+          data={filteredClients as any}
+          getRowKey={(c:any)=>c.id}
+          striped
+          pageSize={10}
+        />
       </CardContent>
     </Card>
   )

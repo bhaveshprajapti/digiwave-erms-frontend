@@ -262,7 +262,7 @@ export function EmployeeForm() {
                   value={formData.gender}
                   onValueChange={(value) => handleChange("gender", value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9 w-full">
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
@@ -279,6 +279,7 @@ export function EmployeeForm() {
                   onChange={(date: Date | undefined) => {
                     handleChange("birth_date", date?.toISOString().split('T')[0] || "")
                   }}
+                  inputClassName="h-9"
                 />
               </div>
             </div>
@@ -289,7 +290,7 @@ export function EmployeeForm() {
                 value={formData.marital_status}
                 onValueChange={(value) => handleChange("marital_status", value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-9 w-full">
                   <SelectValue placeholder="Select marital status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -559,21 +560,20 @@ export function EmployeeForm() {
                 </Label>
               </div>
 
-              {formData.is_on_probation && (
-                <div className="ml-8">
-                  <Label htmlFor="probation_months">Probation Period (Months)</Label>
-                  <Input
-                    id="probation_months"
-                    type="number"
-                    min="1"
-                    max="24"
-                    value={formData.probation_months}
-                    onChange={(e) => handleChange("probation_months", e.target.value)}
-                    placeholder="Enter number of months (1-24)"
-                    className="mt-1"
-                  />
-                </div>
-              )}
+              <div className="ml-8">
+                <Label htmlFor="probation_months">Probation Period (Months)</Label>
+                <Input
+                  id="probation_months"
+                  type="number"
+                  min="1"
+                  max="24"
+                  value={formData.probation_months}
+                  onChange={(e) => handleChange("probation_months", e.target.value)}
+                  placeholder="Enter number of months (1-24)"
+                  className="mt-1"
+                  disabled={!formData.is_on_probation}
+                />
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -591,17 +591,17 @@ export function EmployeeForm() {
                 </Label>
               </div>
 
-              {formData.is_on_notice_period && (
-                <div className="ml-8">
-                  <Label htmlFor="notice_period_end_date">Notice Period End Date</Label>
-                  <DatePicker
-                    value={formData.notice_period_end_date ? new Date(formData.notice_period_end_date) : undefined}
-                    onChange={(date: Date | undefined) => {
-                      handleChange("notice_period_end_date", date?.toISOString().split('T')[0] || "")
-                    }}
-                  />
-                </div>
-              )}
+              <div className="ml-8">
+                <Label htmlFor="notice_period_end_date">Notice Period End Date</Label>
+                <DatePicker
+                  value={formData.notice_period_end_date ? new Date(formData.notice_period_end_date) : undefined}
+                  onChange={(date: Date | undefined) => {
+                    handleChange("notice_period_end_date", date?.toISOString().split('T')[0] || "")
+                  }}
+                  inputClassName="h-9"
+                  disabled={!formData.is_on_notice_period}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

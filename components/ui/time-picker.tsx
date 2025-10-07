@@ -10,9 +10,10 @@ interface TimePickerProps {
   label?: string
   min?: string
   max?: string
+  withSeconds?: boolean
 }
 
-export function TimePicker({ date, setDate, label, min, max }: TimePickerProps) {
+export function TimePicker({ date, setDate, label, min, max, withSeconds = true }: TimePickerProps) {
   const [timeValue, setTimeValue] = React.useState('')
 
   // Update input value when date changes
@@ -20,7 +21,8 @@ export function TimePicker({ date, setDate, label, min, max }: TimePickerProps) 
     if (date) {
       const hours = date.getHours().toString().padStart(2, '0')
       const minutes = date.getMinutes().toString().padStart(2, '0')
-      setTimeValue(`${hours}:${minutes}`)
+      const seconds = date.getSeconds().toString().padStart(2, '0')
+      setTimeValue(withSeconds ? `${hours}:${minutes}:${seconds}` : `${hours}:${minutes}`)
     } else {
       setTimeValue('')
     }
@@ -31,9 +33,10 @@ export function TimePicker({ date, setDate, label, min, max }: TimePickerProps) 
     setTimeValue(value)
     
     if (value) {
-      const [hours, minutes] = value.split(':').map(Number)
+      const parts = value.split(':').map(Number)
+      const [hours, minutes, seconds = 0] = parts
       const newDate = new Date()
-      newDate.setHours(hours, minutes, 0, 0)
+      newDate.setHours(hours, minutes, seconds, 0)
       setDate(newDate)
     } else {
       setDate(undefined)
@@ -69,6 +72,7 @@ export function TimePicker({ date, setDate, label, min, max }: TimePickerProps) 
           onChange={handleTimeChange}
           min={min}
           max={max}
+          step={withSeconds ? 1 : 60}
           required
         />
       </div>
