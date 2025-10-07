@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { DataTable } from "@/components/common/data-table"
 import { useToast } from "@/hooks/use-toast"
 import { 
   CheckCircle, 
@@ -46,6 +45,8 @@ export function ProfileRequestsManagement() {
   const [selectedUser, setSelectedUser] = useState<{ user_id: number; user_name: string; user_email: string } | null>(null)
   const [adminComment, setAdminComment] = useState("")
   const [processing, setProcessing] = useState(false)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [modalAction, setModalAction] = useState<'approve' | 'reject' | null>(null)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -74,22 +75,6 @@ export function ProfileRequestsManagement() {
       await api.post(`/accounts/profile-update-requests/${requestId}/approve/`, {
         admin_comment: adminComment
       })
-      
-      toast({
-        title: "Request Approved",
-        description: "Profile update has been approved and applied",
-      })
-      
-      loadRequests() // Refresh the list
-      setSelectedRequest(null)
-      setAdminComment("")
-    } catch (error) {
-      console.error("Error approving request:", error)
-      toast({
-        title: "Error",
-        description: "Failed to approve the request",
-        variant: "destructive",
-      })
     } finally {
       setProcessing(false)
     }
@@ -101,23 +86,34 @@ export function ProfileRequestsManagement() {
       await api.post(`/accounts/profile-update-requests/${requestId}/reject/`, {
         admin_comment: adminComment && adminComment.trim().length > 0 ? adminComment : 'Request rejected'
       })
-      
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const handleBulk = async (userId: number, action: 'approve' | 'reject') => {
+    const pending = filteredRequests.filter(r => r.user === userId && r.status === 'pending')
+    if (pending.length === 0) return
+    setProcessing(true)
+    try {
+      for (const req of pending) {
+        if (action === 'approve') {
+          await api.post(`/accounts/profile-update-requests/${req.id}/approve/`, { admin_comment: adminComment })
+        } else {
+          await api.post(`/accounts/profile-update-requests/${req.id}/reject/`, { admin_comment: adminComment || 'Request rejected' })
+        }
+      }
       toast({
-        title: "Request Rejected",
-        description: "Profile update has been rejected",
+        title: action === 'approve' ? 'Approved' : 'Rejected',
+        description: `${pending.length} change(s) ${action}d for ${selectedUser?.user_name || ''}`,
       })
-      
-      loadRequests() // Refresh the list
-      setSelectedRequest(null)
-      setAdminComment("")
+      await loadRequests()
+      setAdminComment('')
+      setIsModalOpen(false)
+      setModalAction(null)
+      setSelectedUser(null)
     } catch (error: any) {
-      console.error("Error rejecting request:", error)
-      const description = error?.response?.data?.error || "Failed to reject the request"
-      toast({
-        title: "Error",
-        description,
-        variant: "destructive",
-      })
+      toast({ title: 'Error', description: error?.response?.data?.error || 'Operation failed', variant: 'destructive' })
     } finally {
       setProcessing(false)
     }
@@ -253,139 +249,198 @@ export function ProfileRequestsManagement() {
               <p className="text-gray-500">No profile update requests found</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Totals</TableHead>
-                  <TableHead>Latest Request</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {groupedByUser.map((u) => (
-                  <TableRow key={u.user_id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{u.user_name}</p>
-                        <p className="text-sm text-gray-500">{u.user_email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Total {u.total}</Badge>
-                        <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Pending {u.pending}</Badge>
-                        <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Approved {u.approved}</Badge>
-                        <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">Rejected {u.rejected}</Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-1 text-sm text-gray-500">
-                        <Calendar className="h-3 w-3" />
-                        <span>{new Date(u.latest).toLocaleDateString()}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser({ user_id: u.user_id, user_name: u.user_name, user_email: u.user_email })
-                              setAdminComment("")
-                            }}
-                          >
-                            View Requests
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-3xl">
-                          <DialogHeader>
-                            <DialogTitle>Requests for {selectedUser?.user_name}</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            {filteredRequests.filter(r => r.user === selectedUser?.user_id).length === 0 ? (
-                              <div className="text-center py-8 text-gray-500">No requests for this user.</div>
-                            ) : (
-                              filteredRequests
-                                .filter(r => r.user === selectedUser?.user_id)
-                                .map((request) => (
-                                  <div key={request.id} className="border rounded-lg p-4">
-                                    <div className="flex items-start justify-between">
-                                      <div className="space-y-2 w-full">
-                                        <div className="flex items-center gap-2">
-                                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                            {formatFieldName(request.field_name)}
-                                          </Badge>
-                                          {getStatusBadge(request.status)}
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                          <div>
-                                            <Label className="text-red-600">Current Value</Label>
-                                            <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
-                                              {request.old_value || 'Empty'}
-                                            </div>
-                                          </div>
-                                          <div>
-                                            <Label className="text-green-600">New Value</Label>
-                                            <div className="p-2 bg-green-50 border border-green-200 rounded text-sm">
-                                              {request.new_value}
-                                            </div>
-                                          </div>
-                                        </div>
-                                        {request.reason && (
-                                          <div>
-                                            <Label>Reason</Label>
-                                            <div className="p-2 bg-gray-50 border rounded text-sm">
-                                              {request.reason}
-                                            </div>
-                                          </div>
-                                        )}
-                                        {request.status === 'pending' && (
-                                          <div className="flex flex-col md:flex-row md:items-center gap-2 md:justify-end pt-2">
-                                            <Textarea
-                                              value={adminComment}
-                                              onChange={(e) => setAdminComment(e.target.value)}
-                                              placeholder="Admin comment (optional)"
-                                              className="md:max-w-sm"
-                                            />
-                                            <div className="flex items-center gap-2">
-                                              <Button
-                                                variant="outline"
-                                                onClick={() => handleReject(request.id)}
-                                                disabled={processing}
-                                                className="text-red-600 border-red-200 hover:bg-red-50"
-                                              >
-                                                <XCircle className="h-4 w-4 mr-2" />
-                                                Reject
-                                              </Button>
-                                              <Button
-                                                onClick={() => handleApprove(request.id)}
-                                                disabled={processing}
-                                                className="bg-green-600 hover:bg-green-700"
-                                              >
-                                                <CheckCircle className="h-4 w-4 mr-2" />
-                                                Approve
-                                              </Button>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))
-                            )}
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable<any>
+              columns={[
+{ key: 'employee', header: 'Employee', cell: (u:any) => (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedUser({ user_id: u.user_id, user_name: u.user_name, user_email: u.user_email })
+                      setAdminComment('')
+                      setModalAction(null)
+                      setIsModalOpen(true)
+                    }}
+                    className="text-left hover:underline"
+                  >
+                    <p className="font-medium text-primary">{u.user_name}</p>
+                    <p className="text-sm text-gray-500">{u.user_email}</p>
+                  </button>
+                )},
+                { key: 'totals', header: 'Totals', cell: (u:any) => (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Total {u.total}</Badge>
+                    <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">Pending {u.pending}</Badge>
+                    <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">Approved {u.approved}</Badge>
+                    <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">Rejected {u.rejected}</Badge>
+                  </div>
+                )},
+                { key: 'latest', header: 'Latest Request', sortable: true, sortAccessor: (u:any)=> new Date(u.latest).getTime(), cell: (u:any) => (
+                  <div className="flex items-center space-x-1 text-sm text-gray-500">
+                    <Calendar className="h-3 w-3" />
+                    <span>{new Date(u.latest).toLocaleDateString()}</span>
+                  </div>
+                )},
+{ key: 'actions', header: <span className="block text-center">Actions</span>, cell: (u:any) => (
+                  <div className="flex items-center justify-center gap-2">
+                    {u.pending > 0 ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleBulk(u.user_id, 'reject')}
+                          disabled={processing}
+                          className="text-red-600 border-red-200 hover:bg-red-50"
+                        >
+                          <XCircle className="h-4 w-4 mr-2" /> Reject
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleBulk(u.user_id, 'approve')}
+                          disabled={processing}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" /> Approve
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">No pending</span>
+                    )}
+                  </div>
+                )}
+              ]}
+              data={groupedByUser as any}
+              getRowKey={(u:any)=>u.user_id}
+              striped
+            />
           )}
         </CardContent>
       </Card>
+
+      {/* Employee-style full-screen modal */}
+      {isModalOpen && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
+          <div className="relative w-[95vw] max-w-[1000px] max-h-[85vh] bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="px-6 py-4 border-b bg-white flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {modalAction === 'approve' ? 'Approve' : 'Reject'} all requests — {selectedUser.user_name}
+                  </h2>
+                  <p className="text-sm text-gray-500">{selectedUser.user_email}</p>
+                </div>
+                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 space-y-4">
+                {(() => {
+                  const pendingCount = filteredRequests.filter(r => r.user === selectedUser.user_id && r.status === 'pending').length
+                  return (
+                    <div className="rounded-md border p-3 bg-muted/30">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm">Admin comment (optional)</Label>
+                        <span className="text-xs text-muted-foreground">{pendingCount} pending</span>
+                      </div>
+                      <Textarea
+                        value={adminComment}
+                        onChange={(e) => setAdminComment(e.target.value)}
+                        placeholder="Add a note about this decision"
+                        className="mt-1"
+                        disabled={pendingCount === 0}
+                      />
+                    </div>
+                  )
+                })()}
+                {filteredRequests
+                  .filter(r => r.user === selectedUser.user_id)
+                  .map((request) => (
+                    <div key={request.id} className="border rounded-lg p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            {formatFieldName(request.field_name)}
+                          </Badge>
+                          {getStatusBadge(request.status)}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label className="text-red-600">Current Value</Label>
+                            <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
+                              {request.old_value || 'Empty'}
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-green-600">New Value</Label>
+                            <div className="p-2 bg-green-50 border border-green-200 rounded text-sm">
+                              {request.new_value}
+                            </div>
+                          </div>
+                        </div>
+                        {request.reason && (
+                          <div>
+                            <Label>Reason</Label>
+                            <div className="p-2 bg-gray-50 border rounded text-sm">
+                              {request.reason}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t bg-gray-50 flex-shrink-0">
+              <div className="flex gap-3 w-full justify-end">
+                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} disabled={processing} className="px-4 h-9">
+                  Cancel
+                </Button>
+                {(() => {
+                  const pendingCount = filteredRequests.filter(r => r.user === selectedUser.user_id && r.status === 'pending').length
+                  if (pendingCount === 0) {
+                    return <span className="text-sm text-muted-foreground">No pending changes</span>
+                  }
+                  if (modalAction === 'reject') {
+                    return (
+                      <Button onClick={() => handleBulk(selectedUser.user_id, 'reject')} disabled={processing} className="px-6 h-9 text-red-600 border-red-200 hover:bg-red-50" variant="outline">
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject All
+                      </Button>
+                    )
+                  }
+                  if (modalAction === 'approve') {
+                    return (
+                      <Button onClick={() => handleBulk(selectedUser.user_id, 'approve')} disabled={processing} className="px-6 h-9 bg-green-600 hover:bg-green-700">
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve All
+                      </Button>
+                    )
+                  }
+                  return (
+                    <>
+                      <Button onClick={() => handleBulk(selectedUser.user_id, 'reject')} disabled={processing} className="px-6 h-9 text-red-600 border-red-200 hover:bg-red-50" variant="outline">
+                        <XCircle className="h-4 w-4 mr-2" /> Reject All
+                      </Button>
+                      <Button onClick={() => handleBulk(selectedUser.user_id, 'approve')} disabled={processing} className="px-6 h-9 bg-green-600 hover:bg-green-700">
+                        <CheckCircle className="h-4 w-4 mr-2" /> Approve All
+                      </Button>
+                    </>
+                  )
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

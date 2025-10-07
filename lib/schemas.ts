@@ -58,3 +58,10 @@ export interface Shift {
   is_overnight: boolean
   is_active: boolean
 }
+
+export interface Holiday {
+  id: number
+  date: string // YYYY-MM-DD
+  title: string
+  description?: string | null
+}
