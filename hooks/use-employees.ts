@@ -48,7 +48,8 @@ export async function createEmployee(data: FormData | Partial<Employee>) {
 
 export async function updateEmployee(id: string, data: FormData | Partial<Employee>) {
   const isFormData = data instanceof FormData
-  const response = await api.put(`/accounts/users/${id}/`, data, {
+  // Use PATCH to avoid requiring write-only fields like password on updates
+  const response = await api.patch(`/accounts/users/${id}/`, data, {
     headers: isFormData ? {
       'Content-Type': 'multipart/form-data',
     } : undefined,

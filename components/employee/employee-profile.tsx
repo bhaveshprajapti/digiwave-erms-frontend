@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { Switch } from "@/components/ui/switch"
 import { 
   User, 
   Mail, 
@@ -57,6 +58,8 @@ export function EmployeeProfile() {
     emergency_contact: "",
     emergency_phone: "",
   })
+
+  const [sameAsCurrentAddress, setSameAsCurrentAddress] = useState(false)
 
   const [requestDocumentLink, setRequestDocumentLink] = useState("")
 
@@ -452,21 +455,44 @@ export function EmployeeProfile() {
                       editMode ? "" : "bg-gray-50"
                     }`}
                     value={formData.current_address}
-                    onChange={(e) => handleInputChange("current_address", e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      handleInputChange("current_address", val)
+                      if (sameAsCurrentAddress) {
+                        setFormData(prev => ({ ...prev, permanent_address: val }))
+                      }
+                    }}
                     disabled={!editMode}
                     placeholder="Enter your current address"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="permanent_address">Permanent Address</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="permanent_address">Permanent Address</Label>
+                    {editMode && (
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="same_as_current_addr" className="text-sm">Same as current</Label>
+                        <Switch
+                          id="same_as_current_addr"
+                          checked={sameAsCurrentAddress}
+                          onCheckedChange={(checked) => {
+                            setSameAsCurrentAddress(checked)
+                            if (checked) {
+                              setFormData(prev => ({ ...prev, permanent_address: prev.current_address }))
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
                   <textarea
                     id="permanent_address"
                     className={`w-full min-h-[80px] px-3 py-2 border border-gray-300 rounded-md resize-none ${
                       editMode ? "" : "bg-gray-50"
                     }`}
-                    value={formData.permanent_address}
+                    value={sameAsCurrentAddress ? formData.current_address : formData.permanent_address}
                     onChange={(e) => handleInputChange("permanent_address", e.target.value)}
-                    disabled={!editMode}
+                    disabled={!editMode || sameAsCurrentAddress}
                     placeholder="Enter your permanent address"
                   />
                 </div>

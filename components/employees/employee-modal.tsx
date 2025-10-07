@@ -113,6 +113,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
   const [selectedDesignations, setSelectedDesignations] = useState<string[]>([])
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [selectedTechnologies, setSelectedTechnologies] = useState<string[]>([])
+  const [sameAsCurrent, setSameAsCurrent] = useState<boolean>(false)
 
   // Function to fetch address text from address ID
   const fetchAddressText = async (addressId: number): Promise<string> => {
@@ -305,8 +306,8 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
         formDataToSend.append('current_address_text', formData.current_address)
       }
       
-      if (formData.permanent_address) {
-        formDataToSend.append('permanent_address_text', formData.permanent_address)
+      if (sameAsCurrent || formData.permanent_address) {
+        formDataToSend.append('permanent_address_text', sameAsCurrent ? formData.current_address : formData.permanent_address)
       }
       
       if (formData.document_link) {
@@ -395,7 +396,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
       />
       
       {/* Modal */}
-      <div className="relative w-[90vw] max-w-[800px] max-h-[85vh] bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-[95vw] max-w-[1000px] max-h-[85vh] bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b bg-white flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -518,7 +519,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                           value={formData.gender}
                           onValueChange={(value) => handleChange("gender", value)}
                         >
-                          <SelectTrigger className="h-9">
+                          <SelectTrigger className="h-9 w-full">
                             <SelectValue placeholder="-- Select --" />
                           </SelectTrigger>
                           <SelectContent>
@@ -545,7 +546,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                           value={formData.marital_status}
                           onValueChange={(value) => handleChange("marital_status", value)}
                         >
-                          <SelectTrigger className="h-9">
+                          <SelectTrigger className="h-9 w-full">
                             <SelectValue placeholder="-- Select --" />
                           </SelectTrigger>
                           <SelectContent>
@@ -568,32 +569,51 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                         Contact Details
                       </th>
                     </tr>
-                    <tr>
-                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Current Address</th>
-                      <td colSpan={3} className="p-2 border">
-                        <textarea
-                          id="current_address"
-                          className="w-full min-h-[60px] px-3 py-2 border border-gray-300 rounded-md resize-none"
-                          placeholder="Enter current address"
-                          value={formData.current_address}
-                          onChange={(e) => handleChange("current_address", e.target.value)}
-                          rows={2}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Permanent Address</th>
-                      <td colSpan={3} className="p-2 border">
-                        <textarea
-                          id="permanent_address"
-                          className="w-full min-h-[60px] px-3 py-2 border border-gray-300 rounded-md resize-none"
-                          placeholder="Enter permanent address"
-                          value={formData.permanent_address}
-                          onChange={(e) => handleChange("permanent_address", e.target.value)}
-                          rows={2}
-                        />
-                      </td>
-                    </tr>
+        <tr>
+          <th className="p-2 text-left text-sm font-medium text-gray-600 border">Current Address</th>
+          <td colSpan={3} className="p-2 border">
+            <textarea
+              id="current_address"
+              className="w-full min-h-[60px] px-3 py-2 border border-gray-300 rounded-md resize-none"
+              placeholder="Enter current address"
+              value={formData.current_address}
+              onChange={(e) => {
+                const val = e.target.value
+                handleChange("current_address", val)
+                if (sameAsCurrent) {
+                  handleChange("permanent_address", val)
+                }
+              }}
+              rows={2}
+            />
+          </td>
+        </tr>
+        <tr>
+          <th className="p-2 text-left text-sm font-medium text-gray-600 border">Permanent Address</th>
+          <td colSpan={3} className="p-2 border">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-700">Enter permanent address</span>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="same_as_current_modal" className="text-sm">Same as current</Label>
+                <Switch id="same_as_current_modal" checked={sameAsCurrent} onCheckedChange={(checked) => {
+                  setSameAsCurrent(checked)
+                  if (checked) {
+                    handleChange("permanent_address", formData.current_address)
+                  }
+                }} />
+              </div>
+            </div>
+            <textarea
+              id="permanent_address"
+              className="w-full min-h-[60px] px-3 py-2 border border-gray-300 rounded-md resize-none"
+              placeholder="Enter permanent address"
+              value={sameAsCurrent ? formData.current_address : formData.permanent_address}
+              onChange={(e) => handleChange("permanent_address", e.target.value)}
+              rows={2}
+              disabled={sameAsCurrent}
+            />
+          </td>
+        </tr>
                     <tr>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Emergency Contact</th>
                       <td className="p-2 border">
@@ -895,6 +915,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                             handleChange("notice_period_end_date", date?.toISOString().split('T')[0] || "")
                           }}
                           disabled={!formData.is_on_notice_period}
+                          inputClassName="h-9"
                         />
                       </td>
                     </tr>

@@ -5,10 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Search, MoreVertical, Download, Eye, Trash2, FileText, ImageIcon, FileArchive, File } from "lucide-react"
+import { Search, Download, Eye, Trash2, FileText, ImageIcon, FileArchive, File } from "lucide-react"
+import { DataTable } from "@/components/common/data-table"
+import { ActionButtons } from "@/components/common/action-buttons"
 
 const mockFiles = [
   {
@@ -111,59 +111,32 @@ export function FileList() {
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead>Uploaded By</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredFiles.map((file) => (
-                  <TableRow key={file.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getFileIcon(file.type)}
-                        <span className="font-medium">{file.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{file.category}</Badge>
-                    </TableCell>
-                    <TableCell>{file.size}</TableCell>
-                    <TableCell>{file.uploadedBy}</TableCell>
-                    <TableCell>{new Date(file.uploadedDate).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Preview
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <DataTable<typeof filteredFiles[0]>
+              columns={[
+                { key: 'name', header: 'Name', sortable: true, cell: (f:any) => (
+                  <div className="flex items-center gap-2">{getFileIcon(f.type)}<span className="font-medium">{f.name}</span></div>
+                )},
+                { key: 'category', header: 'Category', sortable: true, cell: (f:any) => <Badge variant="outline">{f.category}</Badge> },
+                { key: 'size', header: 'Size' },
+                { key: 'uploadedBy', header: 'Uploaded By', sortable: true },
+                { key: 'uploadedDate', header: 'Date', sortable: true, sortAccessor: (f:any)=> new Date(f.uploadedDate).getTime(), cell: (f:any) => new Date(f.uploadedDate).toLocaleDateString() },
+                { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (file:any) => (
+                  <div className="flex items-center justify-center">
+                    <ActionButtons
+                      extras={[
+                        { title: 'Preview', onClick: () => {}, icon: <Eye className="h-4 w-4" /> },
+                        { title: 'Download', onClick: () => {}, icon: <Download className="h-4 w-4" /> },
+                        { title: 'Delete', onClick: () => {}, className: 'hover:bg-red-100', icon: <Trash2 className="h-4 w-4 text-red-600" /> },
+                      ]}
+                    />
+                  </div>
+                )},
+              ]}
+              data={filteredFiles as any}
+              getRowKey={(f:any)=>f.id}
+              striped
+              pageSize={10}
+            />
           </TabsContent>
         </Tabs>
       </CardContent>

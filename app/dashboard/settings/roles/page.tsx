@@ -18,24 +18,38 @@ export default function RolesPage() {
   })
 
   const addRole = useMutation({
-    mutationFn: (data: Partial<Role>) =>
-      fetch(`${API_BASE_URL}/roles/`, {
+    mutationFn: (data: Partial<Role>) => {
+      const payload: any = {
+        name: data.name,
+        display_name: data.name,
+        description: data.description,
+        is_active: data.is_active,
+      }
+      return fetch(`${API_BASE_URL}/roles/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      }).then(res => res.json()),
+        body: JSON.stringify(payload),
+      }).then(res => res.json())
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles"] })
     },
   })
 
   const editRole = useMutation({
-    mutationFn: ({ id, data }: { id: number, data: Partial<Role> }) =>
-      fetch(`${API_BASE_URL}/roles/${id}/`, {
-        method: 'PUT',
+    mutationFn: ({ id, data }: { id: number, data: Partial<Role> }) => {
+      const payload: any = {
+        ...data,
+      }
+      if (data.name) {
+        payload.display_name = data.name
+      }
+      return fetch(`${API_BASE_URL}/roles/${id}/`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      }).then(res => res.json()),
+        body: JSON.stringify(payload),
+      }).then(res => res.json())
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["roles"] })
     },
@@ -61,7 +75,6 @@ export default function RolesPage() {
           isLoading={isLoading}
           fields={[
             { key: "name", label: "Name", type: "text" },
-            { key: "display_name", label: "Display Name", type: "text" },
             { key: "description", label: "Description", type: "text" },
             { key: "is_active", label: "Status", type: "switch" },
           ]}

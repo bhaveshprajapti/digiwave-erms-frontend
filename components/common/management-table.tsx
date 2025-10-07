@@ -1,13 +1,5 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { TimePicker } from "@/components/ui/time-picker"
+import { TimeClock } from "@/components/ui/time-clock"
 import {
   Dialog,
   DialogContent,
@@ -21,9 +13,11 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
-import { Plus, Edit2, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useState } from "react"
 import Swal from 'sweetalert2'
+import { DataTable } from "@/components/common/data-table"
+import { ActionButtons } from "@/components/common/action-buttons"
 
 interface ManagementTableProps<T> {
   title: string
@@ -34,13 +28,15 @@ interface ManagementTableProps<T> {
     key: keyof T
     label: string
     type: "text" | "switch" | "number" | "time"
+    readonly?: boolean
   }[]
   onAdd: (data: Partial<T>) => Promise<void>
   onEdit: (id: number, data: Partial<T>) => Promise<void>
   onDelete: (id: number) => Promise<void>
+  labelKey?: keyof T // which field to display as the item's label (defaults to 'name')
 }
 
-export function ManagementTable<T extends { id: number; name: string; is_active?: boolean }>({
+export function ManagementTable<T extends { id: number; is_active?: boolean }>({
   title,
   description,
   items,
@@ -49,6 +45,7 @@ export function ManagementTable<T extends { id: number; name: string; is_active?
   onAdd,
   onEdit,
   onDelete,
+  labelKey,
 }: ManagementTableProps<T>) {
   const { toast } = useToast()
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -71,6 +68,8 @@ export function ManagementTable<T extends { id: number; name: string; is_active?
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const validateField = (field: typeof fields[0], value: any): string => {
+    // Skip validation for readonly fields
+    if ((field as any).readonly) return ''
     if (field.type === 'text' && (!value || value.toString().trim() === '')) {
       return `${field.label} is required`
     }
@@ -88,6 +87,7 @@ export function ManagementTable<T extends { id: number; name: string; is_active?
     let isValid = true
 
     fields.forEach(field => {
+      if ((field as any).readonly) return
       const value = formData[field.key]
       const error = validateField(field, value)
       if (error) {
@@ -108,6 +108,7 @@ export function ManagementTable<T extends { id: number; name: string; is_active?
     // Ensure all required fields are present with proper defaults
     const submitData = { ...formData }
     fields.forEach(field => {
+      if ((field as any).readonly) return
       if (submitData[field.key] === undefined || submitData[field.key] === '') {
         if (field.type === 'switch') {
           submitData[field.key] = (field.key === 'is_active' ? true : false) as any
@@ -179,9 +180,10 @@ export function ManagementTable<T extends { id: number; name: string; is_active?
   }
 
   const handleDelete = async (item: T) => {
+    const label = (labelKey ? (item[labelKey] as any) : (item as any).name) ?? 'record'
     const result = await Swal.fire({
       title: 'Are you sure?',
-      text: `You are about to delete "${item.name}". This action cannot be undone!`,
+      text: `You are about to delete "${label}". This action cannot be undone!`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
@@ -229,7 +231,9 @@ export function ManagementTable<T extends { id: number; name: string; is_active?
               checked={Boolean(value)}
               onCheckedChange={(checked) => onChange(Boolean(checked))}
             />
-            <Label htmlFor={String(field.key)}>{field.label}</Label>
+            <span className="text-sm text-muted-foreground">
+              {Boolean(value) ? "Active" : "Inactive"}
+            </span>
           </div>
         )
       case "number":
@@ -243,18 +247,10 @@ export function ManagementTable<T extends { id: number; name: string; is_active?
         )
       case "time":
         return (
-          <TimePicker
-            label={field.label}
-            date={value ? new Date(`1970-01-01T${value}`) : undefined}
-            setDate={(date: Date | undefined) => {
-              if (date) {
-                const hours = date.getHours().toString().padStart(2, '0')
-                const minutes = date.getMinutes().toString().padStart(2, '0')
-                onChange(`${hours}:${minutes}`)
-              } else {
-                onChange('')
-              }
-            }}
+          <TimeClock
+            value={value as string}
+            onChange={(t: string) => onChange(t)}
+            withSeconds
           />
         )
       default:
@@ -273,7 +269,7 @@ export function ManagementTable<T extends { id: number; name: string; is_active?
     const currentData = editingItem ? editingItem : formData
     return (
       <div className="grid gap-4 py-4">
-        {fields.map((field) => (
+        {fields.filter(f => !f.readonly).map((field) => (
           <div key={field.key as string} className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor={field.key as string} className="text-right pt-2">
               {field.label}
@@ -330,76 +326,58 @@ export function ManagementTable<T extends { id: number; name: string; is_active?
         </Dialog>
       </div>
       <div className="mt-4">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {fields.map((field) => (
-                <TableHead key={field.key as string}>{field.label}</TableHead>
-              ))}
-              <TableHead className="w-[100px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id}>
-                {fields.map((field) => (
-                  <TableCell key={field.key as string}>
-                    {field.type === "switch" ? (
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={Boolean(item[field.key])}
-                          onCheckedChange={async (checked) => {
-                            try {
-                              await onEdit(item.id, { [field.key]: checked } as Partial<T>)
-                              toast({
-                                title: "Success",
-                                description: "Status updated successfully",
-                              })
-                            } catch (error) {
-                              toast({
-                                title: "Error",
-                                description: "Failed to update status",
-                                variant: "destructive",
-                              })
-                            }
-                          }}
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {Boolean(item[field.key]) ? "Active" : "Inactive"}
-                        </span>
-                      </div>
-                    ) : (
-                      String(item[field.key] ?? "")
-                    )}
-                  </TableCell>
-                ))}
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        setEditingItem(item)
-                        setFormData({ ...item })
-                        setErrors({})
-                        setIsEditOpen(true)
+        <DataTable<T>
+          columns={[
+            ...fields.map((field) => ({
+              key: String(field.key),
+              header: field.label,
+              cell: (item: T) => (
+                field.type === 'switch' ? (
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={Boolean((item as any)[field.key])}
+                      onCheckedChange={async (checked) => {
+                        try {
+                          await onEdit((item as any).id, { [field.key]: checked } as Partial<T>)
+                          toast({ title: 'Success', description: 'Status updated successfully' })
+                        } catch (error) {
+                          toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+                        }
                       }}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(item)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    />
+                    <span className="text-sm text-muted-foreground">{Boolean((item as any)[field.key]) ? 'Active' : 'Inactive'}</span>
                   </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                ) : (
+                  (() => {
+                    const v = (item as any)[field.key]
+                    if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+                    return String(v ?? '')
+                  })()
+                )
+              )
+            })),
+            {
+              key: 'actions',
+              header: <span className="block text-center">Actions</span>,
+              cell: (item: T) => (
+                <div className="flex items-center justify-center">
+                  <ActionButtons
+                    onEdit={() => {
+                      setEditingItem(item)
+                      setFormData({ ...(item as any) })
+                      setErrors({})
+                      setIsEditOpen(true)
+                    }}
+                    onDelete={() => handleDelete(item)}
+                  />
+                </div>
+              )
+            }
+          ]}
+          data={items}
+          getRowKey={(i) => (i as any).id}
+          striped
+        />
       </div>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

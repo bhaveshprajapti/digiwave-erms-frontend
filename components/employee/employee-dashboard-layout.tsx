@@ -95,10 +95,8 @@ export function EmployeeDashboardLayout({ children }: EmployeeDashboardLayoutPro
       }`}>
         <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">E</span>
-            </div>
-            <span className="text-xl font-bold text-gray-900">Employee Portal</span>
+            <img src="/digiwave-logo.png" alt="Digiwave" className="h-8 w-auto" />
+            <span className="text-xl font-bold text-gray-900">Digiwave Employee Portal</span>
           </div>
           <Button
             variant="ghost"

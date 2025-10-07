@@ -7,12 +7,26 @@ import { cn } from "@/lib/utils"
 import { Building2, ChevronDown, ChevronRight } from "lucide-react"
 import { employeeNavigationSections } from "@/components/layout/employee-navigation"
 
+function normalizePath(p?: string) {
+  if (!p) return ''
+  if (p.length > 1 && p.endsWith('/')) return p.replace(/\/+$/, '')
+  return p
+}
+function isPathActive(pathname: string, href?: string) {
+  if (!href) return false
+  const path = normalizePath(pathname)
+  const target = normalizePath(href)
+  const segs = target.split('/').filter(Boolean).length
+  if (segs <= 1) return path === target
+  return path === target || path.startsWith(target + "/")
+}
+
 function NavItem({ item, pathname, level = 0 }: { item: any, pathname: string, level?: number }) {
-  const [isOpen, setIsOpen] = useState(false)
   const hasChildren = item.children && item.children.length > 0
   const Icon = item.icon
-  const isActive = pathname === item.href
-  const hasActiveChild = hasChildren && item.children.some((child: any) => pathname === child.href)
+  const isActive = isPathActive(pathname, item.href)
+  const hasActiveChild = hasChildren && item.children.some((child: any) => isPathActive(pathname, child.href))
+  const [isOpen, setIsOpen] = useState(hasActiveChild)
 
   if (hasChildren) {
     return (
@@ -21,9 +35,9 @@ function NavItem({ item, pathname, level = 0 }: { item: any, pathname: string, l
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
             "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-            hasActiveChild
-              ? "bg-primary/10 text-primary"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+hasActiveChild
+              ? "bg-white/10 text-white"
+              : "text-white/70 hover:bg-white/10 hover:text-white",
             level > 0 && "ml-4"
           )}
         >
@@ -39,9 +53,9 @@ function NavItem({ item, pathname, level = 0 }: { item: any, pathname: string, l
                 href={child.href}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                  pathname === child.href
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+isPathActive(pathname, child.href)
+                    ? "bg-white/10 text-white"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
                 )}
               >
                 <div className="h-1 w-1 rounded-full bg-current opacity-60" />
@@ -59,9 +73,9 @@ function NavItem({ item, pathname, level = 0 }: { item: any, pathname: string, l
       href={item.href}
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-        isActive
-          ? "bg-primary text-primary-foreground"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+isActive
+          ? "bg-white/10 text-white"
+          : "text-white/70 hover:bg-white/10 hover:text-white",
         level > 0 && "ml-4"
       )}
     >
@@ -77,8 +91,8 @@ export function EmployeeNav() {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card transition-transform md:translate-x-0 hidden md:block">
       <div className="flex h-16 items-center gap-2 border-b px-6">
-        <Building2 className="h-6 w-6 text-primary" />
-        <span className="font-semibold text-lg">Employee Portal</span>
+        <img src="/digiwave-logo.png" alt="Digiwave" className="h-8 w-auto" />
+        <span className="font-semibold text-lg">Digiwave</span>
       </div>
       <nav className="h-[calc(100vh-4rem)] overflow-y-auto p-4">
         <div className="space-y-6">
