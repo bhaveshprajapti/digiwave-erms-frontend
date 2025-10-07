@@ -94,6 +94,7 @@ export function EmployeeForm() {
   })
   
   const [joiningDate, setJoiningDate] = useState<Date>()
+  const [sameAsCurrent, setSameAsCurrent] = useState<boolean>(false)
   const [selectedDesignations, setSelectedDesignations] = useState<string[]>([])
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [selectedTechnologies, setSelectedTechnologies] = useState<string[]>([])
@@ -101,6 +102,14 @@ export function EmployeeForm() {
   const handleChange = useCallback((field: keyof EmployeeFormData, value: string | number[] | boolean | File | null) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }, [])
+
+  const handleSameAsCurrentToggle = (checked: boolean) => {
+    setSameAsCurrent(checked)
+    setFormData(prev => ({
+      ...prev,
+      permanent_address: checked ? prev.current_address : prev.permanent_address
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -130,8 +139,9 @@ export function EmployeeForm() {
         gender: formData.gender,
         birth_date: formData.birth_date,
         marital_status: formData.marital_status,
-        current_address: formData.current_address,
-        permanent_address: formData.permanent_address,
+        // Backend expects *_address_text for creation/update
+        current_address_text: formData.current_address,
+        permanent_address_text: sameAsCurrent ? formData.current_address : formData.permanent_address,
         document_link: formData.document_link,
         account_holder: formData.account_holder,
         account_number: formData.account_number,
@@ -311,14 +321,21 @@ export function EmployeeForm() {
             </div>
 
             <div>
-              <Label htmlFor="permanent_address">Permanent Address</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="permanent_address">Permanent Address</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="same_as_current" className="text-sm">Same as current</Label>
+                  <Switch id="same_as_current" checked={sameAsCurrent} onCheckedChange={handleSameAsCurrentToggle} />
+                </div>
+              </div>
               <textarea
                 id="permanent_address"
                 className="w-full min-h-[60px] px-3 py-2 border rounded-md"
                 placeholder="Enter permanent address"
-                value={formData.permanent_address}
+                value={sameAsCurrent ? formData.current_address : formData.permanent_address}
                 onChange={(e) => handleChange("permanent_address", e.target.value)}
                 rows={2}
+                disabled={sameAsCurrent}
               />
             </div>
 

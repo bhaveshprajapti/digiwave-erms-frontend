@@ -19,18 +19,25 @@ import authService, { type User as AuthUser } from "@/lib/auth"
 export function DashboardHeader() {
   const router = useRouter()
   const [user, setUser] = useState<AuthUser | null>(null)
+  // Keep display strings in state to avoid SSR/client hydration mismatches
+  const [displayName, setDisplayName] = useState<string>('User')
+  const [fullName, setFullName] = useState<string>('User')
 
   useEffect(() => {
     const userData = authService.getUserData()
     setUser(userData)
+    // Update names on client after mount only
+    const dn = authService.getUserDisplayName()
+    const fn = authService.getUserFullName()
+    setDisplayName(dn)
+    setFullName(fn)
   }, [])
 
   const handleLogout = () => {
     authService.logout()
   }
 
-  const displayName = authService.getUserDisplayName()
-  const fullName = authService.getUserFullName()
+  // Names are derived in useEffect to keep server and first client render consistent
   const userInitial = user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'
 
   return (
