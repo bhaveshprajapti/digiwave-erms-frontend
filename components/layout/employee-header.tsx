@@ -20,38 +20,40 @@ import { employeeNavigationSections } from "@/components/layout/employee-navigat
 export function EmployeeHeader() {
   const router = useRouter()
   const [user, setUser] = useState<AuthUser | null>(null)
+  const [displayName, setDisplayName] = useState<string>('User')
+  const [fullName, setFullName] = useState<string>('User')
 
   useEffect(() => {
     const userData = authService.getUserData()
     setUser(userData)
+    setDisplayName(authService.getUserDisplayName())
+    setFullName(authService.getUserFullName())
   }, [])
 
   const handleLogout = () => {
     authService.logout()
   }
 
-  const displayName = authService.getUserDisplayName()
-  const fullName = authService.getUserFullName()
   const userInitial = user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-gradient-to-r from-[#001f3f] via-[#0a2540] to-[#0074d9] px-4 text-white shadow-sm md:px-6">
       <div className="flex items-center gap-4">
         <MobileNav sections={employeeNavigationSections} />
         <div>
-          <h1 className="text-base font-semibold md:text-lg">Employee Portal</h1>
-          <p className="hidden text-sm text-muted-foreground sm:block">{user?.organization?.name || 'Employee'}</p>
+          <h1 className="text-base font-semibold md:text-lg">Welcome, {displayName}</h1>
+          <p className="hidden text-sm text-white/70 sm:block">{user?.organization?.name || 'Employee'}</p>
         </div>
       </div>
       <div className="flex items-center gap-2 md:gap-4">
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" className="text-white/90 hover:bg-white/10">
           <Bell className="h-5 w-5" />
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+            <Button variant="ghost" className="relative h-10 w-10 rounded-full text-white/90 hover:bg-white/10">
               <Avatar>
-                <AvatarFallback>{userInitial}</AvatarFallback>
+                <AvatarFallback className="bg-white/10 text-white">{userInitial}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
