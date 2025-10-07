@@ -8,101 +8,13 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { VisuallyHidden } from "@/components/ui/visually-hidden"
 import {
-  LayoutDashboard,
-  Users,
-  Calendar,
-  Clock,
-  FolderKanban,
-  UserCircle,
-  FileText,
-  DollarSign,
   Menu,
-  Shield,
   Building2,
-  FileBarChart,
   ChevronDown,
   ChevronRight,
-  Server,
-  FolderOpen,
-  Plus,
-  Megaphone,
-  DollarSign as PaymentIcon,
 } from "lucide-react"
 
-// Same navigation structure as dashboard-nav
-const navigationSections = [
-  {
-    title: "DASHBOARD",
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    ]
-  },
-  {
-    title: "DATA",
-    items: [
-      {
-        label: "Projects",
-        icon: FolderKanban,
-        children: [
-          { href: "/dashboard/projects", label: "All Projects" },
-          { href: "/dashboard/quotations", label: "Quotations" },
-          { href: "/dashboard/projects/profit-loss", label: "Project P & L" },
-        ]
-      },
-      {
-        label: "Server & Domain",
-        icon: Server,
-        children: [
-          { href: "/dashboard/servers", label: "Server Details" },
-          { href: "/dashboard/domains", label: "Domain Details" },
-        ]
-      },
-      { href: "/dashboard/files", label: "Files & Docs", icon: FolderOpen },
-      {
-        label: "Add Data",
-        icon: Plus,
-        children: [
-          { href: "/dashboard/settings/roles", label: "Roles & Permission" },
-          { href: "/dashboard/settings/employee-types", label: "Employee Type" },
-          { href: "/dashboard/settings/designations", label: "Designations" },
-          { href: "/dashboard/settings/shifts", label: "Shifts" },
-          { href: "/dashboard/settings/technologies", label: "Technologies" },
-          { href: "/dashboard/settings/apps-services", label: "Apps & Service" },
-          { href: "/dashboard/settings/holidays", label: "Public Holidays" },
-        ]
-      },
-    ]
-  },
-  {
-    title: "USERS",
-    items: [
-      {
-        label: "Employees",
-        icon: Users,
-        children: [
-          { href: "/dashboard/employees", label: "All Employees" },
-          { href: "/dashboard/leave", label: "Leave Management" },
-          { href: "/dashboard/attendance", label: "Attendance" },
-          { href: "/dashboard/admin/policies", label: "Leave Policies" },
-        ]
-      },
-      { href: "/dashboard/clients", label: "Client", icon: UserCircle },
-      { href: "/dashboard/announcements", label: "Announcement & Notice", icon: Megaphone },
-    ]
-  },
-  {
-    title: "PAYMENTS",
-    items: [
-      { href: "/dashboard/payments/from-client", label: "From Client", icon: PaymentIcon },
-    ]
-  },
-  {
-    title: "REPORTS",
-    items: [
-      { href: "/dashboard/admin/audit", label: "Audit Logs", icon: FileBarChart },
-    ]
-  },
-]
+import { navigationSections } from "@/components/layout/navigation"
 
 // Mobile navigation item component
 function MobileNavItem({ item, pathname, onClose, level = 0 }: { item: any, pathname: string, onClose: () => void, level?: number }) {
