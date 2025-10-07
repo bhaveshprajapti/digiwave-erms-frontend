@@ -396,7 +396,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
       />
       
       {/* Modal */}
-      <div className="relative w-[90vw] max-w-[800px] max-h-[85vh] bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-[95vw] max-w-[1000px] max-h-[85vh] bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b bg-white flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -519,7 +519,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                           value={formData.gender}
                           onValueChange={(value) => handleChange("gender", value)}
                         >
-                          <SelectTrigger className="h-9">
+                          <SelectTrigger className="h-9 w-full">
                             <SelectValue placeholder="-- Select --" />
                           </SelectTrigger>
                           <SelectContent>
@@ -546,7 +546,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                           value={formData.marital_status}
                           onValueChange={(value) => handleChange("marital_status", value)}
                         >
-                          <SelectTrigger className="h-9">
+                          <SelectTrigger className="h-9 w-full">
                             <SelectValue placeholder="-- Select --" />
                           </SelectTrigger>
                           <SelectContent>
@@ -915,6 +915,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                             handleChange("notice_period_end_date", date?.toISOString().split('T')[0] || "")
                           }}
                           disabled={!formData.is_on_notice_period}
+                          inputClassName="h-9"
                         />
                       </td>
                     </tr>

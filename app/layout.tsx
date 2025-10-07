@@ -5,8 +5,8 @@ import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Digiwave — Employee Resource Management System',
-  description: 'Digiwave Employee Resource Management System',
+  title: 'Digiwave',
+  description: 'Digiwave employee resource management',
   icons: {
     icon: '/digiwave-logo.png',
   },

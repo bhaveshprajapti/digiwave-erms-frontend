@@ -35,9 +35,9 @@ const useShifts = () => {
   return {
     shifts: shiftsQuery.data || [],
     isLoading: shiftsQuery.isLoading,
-    createShift: createShiftMutation.mutate,
-    updateShift: updateShiftMutation.mutate,
-    deleteShift: deleteShiftMutation.mutate
+    createShift: createShiftMutation.mutateAsync,
+    updateShift: updateShiftMutation.mutateAsync,
+    deleteShift: deleteShiftMutation.mutateAsync
   }
 }
 

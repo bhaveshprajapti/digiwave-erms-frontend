@@ -1,4 +1,4 @@
-// Mock data for the ERMS system
+// Mock data for the Digiwave system
 // In production, this would be replaced with actual API calls
 
 export interface User {

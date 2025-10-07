@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, Eye, Edit, Trash2, Loader2, Plus, Briefcase, Clock, DollarSign } from "lucide-react"
+import { Search, Loader2, Plus, Clock, DollarSign } from "lucide-react"
+import { DataTable, Column } from "@/components/common/data-table"
+import { ActionButtons } from "@/components/common/action-buttons"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { deleteEmployee } from "@/hooks/use-employees"
@@ -206,145 +207,63 @@ export function EmployeeList() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-16 font-semibold">Sr No.</TableHead>
-                  <TableHead className="font-semibold">Username</TableHead>
-                  <TableHead className="font-semibold">Full Name</TableHead>
-                  <TableHead className="font-semibold">Email</TableHead>
-                  <TableHead className="font-semibold">Phone</TableHead>
-                  <TableHead className="font-semibold">Designation</TableHead>
-                  <TableHead className="font-semibold">Type</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="text-center font-semibold">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEmployees.map((employee, index) => (
-                  <TableRow key={employee.id} className="hover:bg-muted/30 transition-colors">
-                    <TableCell className="font-medium">{index + 1}</TableCell>
-                    <TableCell>
-                      <a
-                        href={`/dashboard/employees/${employee.id}`}
-                        className="text-primary hover:text-primary/80 font-medium hover:underline"
-                      >
-                        {employee.username}
-                      </a>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {employee.first_name} {employee.last_name}
-                    </TableCell>
-                    <TableCell className="text-sm">{employee.email}</TableCell>
-                    <TableCell className="text-sm">
-                      {employee.phone || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <div className="flex flex-wrap gap-1 max-w-[200px]">
-                        {employee.designations && employee.designations.length > 0 ? (
-                          employee.designations.map((designationId: number) => {
-                            const designation = designations?.find(d => d.id === designationId)
-                            return designation ? (
-                              <Badge 
-                                key={designation.id}
-                                variant="outline" 
-                                className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 border-purple-200"
-                              >
-                                {designation.title}
-                              </Badge>
-                            ) : null
-                          })
-                        ) : (
-                          <span className="text-gray-500">-</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant="outline" 
-                        className="bg-blue-50 text-blue-700 border-blue-200"
-                      >
-                        {getEmployeeTypeName(employee.employee_type)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge 
-                        variant={employee.is_active ? "default" : "secondary"}
-                        className={employee.is_active ? 
-                          "bg-green-100 text-green-800 border-green-200" : 
-                          "bg-red-100 text-red-800 border-red-200"}
-                      >
-                        {employee.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.location.href = `/dashboard/employees/${employee.id}`}
-                          className="h-8 w-8 p-0 hover:bg-blue-100"
-                          title="View Details"
-                        >
-                          <Eye className="h-4 w-4 text-blue-600" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditEmployee(employee)}
-                          className="h-8 w-8 p-0 hover:bg-yellow-100"
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4 text-yellow-600" />
-                        </Button>
-                        {currentUser?.id !== employee.id && !employee.is_superuser && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteEmployee(employee)}
-                            className="h-8 w-8 p-0 hover:bg-red-100"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </Button>
-                        )}
-                        
-                        {getEmployeeTypeName(employee.employee_type).toLowerCase() === 'fixed' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-green-100"
-                            title="Add Fixed Details"
-                          >
-                            <DollarSign className="h-4 w-4 text-green-600" />
-                          </Button>
-                        )}
-                        
-                        {getEmployeeTypeName(employee.employee_type).toLowerCase() === 'hourly' && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 hover:bg-purple-100"
-                            title="Add Hourly Details"
-                          >
-                            <Clock className="h-4 w-4 text-purple-600" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredEmployees.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      No employees found.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable<EmployeeListItem>
+            columns={[
+              { key: 'sr', header: 'Sr No.', cell: (_e, i) => <span className="font-medium">{i + 1}</span>, className: 'w-16' },
+              { key: 'username', header: 'Username', cell: (e) => (
+                <a href={`/dashboard/employees/${e.id}`} className="text-primary hover:text-primary/80 font-medium hover:underline">{e.username}</a>
+              )},
+              { key: 'full_name', header: 'Full Name', cell: (e) => (
+                <span className="font-medium">{e.first_name} {e.last_name}</span>
+              )},
+              { key: 'email', header: 'Email', cell: (e) => <span className="text-sm">{e.email}</span> },
+              { key: 'phone', header: 'Phone', cell: (e) => <span className="text-sm">{e.phone || '-'}</span> },
+              { key: 'designation', header: 'Designation', cell: (employee) => (
+                <div className="flex flex-wrap gap-1 max-w-[200px]">
+                  {employee.designations && employee.designations.length > 0 ? (
+                    employee.designations.map((designationId: number) => {
+                      const designation = designations?.find(d => d.id === designationId)
+                      return designation ? (
+                        <Badge key={designation.id} variant="outline" className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 border-purple-200">
+                          {designation.title}
+                        </Badge>
+                      ) : null
+                    })
+                  ) : (
+                    <span className="text-gray-500">-</span>
+                  )}
+                </div>
+              )},
+              { key: 'type', header: 'Type', cell: (e) => (
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{getEmployeeTypeName(e.employee_type)}</Badge>
+              )},
+              { key: 'status', header: 'Status', cell: (e) => (
+                <Badge variant={e.is_active ? 'default' : 'secondary'} className={e.is_active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
+                  {e.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              )},
+              { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (employee) => (
+                <div className="flex items-center justify-center">
+                  <ActionButtons
+                    onEdit={() => handleEditEmployee(employee)}
+                    onDelete={currentUser?.id !== employee.id && !employee.is_superuser ? () => handleDeleteEmployee(employee) : undefined}
+                    extras={[
+                      ...(getEmployeeTypeName(employee.employee_type).toLowerCase() === 'fixed'
+                        ? [{ title: 'Add Fixed Details', onClick: () => {}, className: 'hover:bg-green-100', icon: <DollarSign className="h-4 w-4 text-green-600" /> }] as any
+                        : []),
+                      ...(getEmployeeTypeName(employee.employee_type).toLowerCase() === 'hourly'
+                        ? [{ title: 'Add Hourly Details', onClick: () => {}, className: 'hover:bg-purple-100', icon: <Clock className="h-4 w-4 text-purple-600" /> }] as any
+                        : []),
+                    ]}
+                  />
+                </div>
+              )},
+            ]}
+            data={filteredEmployees}
+            getRowKey={(e) => e.id}
+            striped
+            emptyText="No employees found."
+          />
         </CardContent>
       </Card>
       <EmployeeModal
