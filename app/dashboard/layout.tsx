@@ -18,7 +18,7 @@ export default function DashboardLayout({
         <DashboardHeader />
         
         {/* Scrollable Content */}
-        <main className="min-h-[calc(100vh-4rem)] bg-muted/30 p-4 md:p-6">
+        <main className="min-h-[calc(100vh-4rem)] bg-white p-4 md:p-6">
           {children}
         </main>
       </div>

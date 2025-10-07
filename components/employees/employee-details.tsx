@@ -94,6 +94,8 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
   const [recentActivity, setRecentActivity] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentAddressText, setCurrentAddressText] = useState<string>("")
+  const [permanentAddressText, setPermanentAddressText] = useState<string>("")
   
   // Fetch reference data
   const { employeeTypes } = useEmployeeTypes()
@@ -132,6 +134,23 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
     { date: "2025-09-25", action: "Project assigned", time: "E-commerce Platform" },
     { date: "2025-09-20", action: "Expense submitted", time: "$250.00" },
   ]
+  // Utility to resolve address display text (line1) from id or object
+  const resolveAddressText = async (addr: any): Promise<string> => {
+    try {
+      if (!addr) return ""
+      if (typeof addr === 'number') {
+        const resp = await api.get(`/common/addresses/${addr}/`)
+        return resp.data?.line1 || ""
+      }
+      if (typeof addr === 'object') {
+        return addr?.line1 || ""
+      }
+      return ""
+    } catch {
+      return ""
+    }
+  }
+
   useEffect(() => {
     const fetchEmployeeData = async () => {
       try {
@@ -141,6 +160,14 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
         const employeeResponse = await api.get(`/accounts/users/${employeeId}/`)
         const employeeData = employeeResponse.data
         setEmployee(employeeData)
+        
+        // Resolve addresses for display
+        const [currAddrText, permAddrText] = await Promise.all([
+          resolveAddressText(employeeData.current_address),
+          resolveAddressText(employeeData.permanent_address)
+        ])
+        setCurrentAddressText(currAddrText)
+        setPermanentAddressText(permAddrText)
         
         // Fetch employee type name if ID is provided
         if (employeeData.employee_type) {
@@ -382,13 +409,13 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
                 <div>
                   <span className="text-sm text-muted-foreground">Current Address</span>
                   <p className="text-sm font-medium">
-                    {employee?.current_address?.line1 || 'Not provided'}
+                    {currentAddressText || 'Not provided'}
                   </p>
                 </div>
                 <div>
                   <span className="text-sm text-muted-foreground">Permanent Address</span>
                   <p className="text-sm font-medium">
-                    {employee?.permanent_address?.line1 || 'Not provided'}
+                    {permanentAddressText || 'Not provided'}
                   </p>
                 </div>
               </CardContent>

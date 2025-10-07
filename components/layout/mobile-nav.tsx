@@ -104,8 +104,8 @@ export function MobileNav({ sections }: { sections?: any[] } = {}) {
         
         {/* Logo */}
         <div className="flex h-16 items-center gap-2 border-b px-6">
-          <Building2 className="h-6 w-6 text-primary" />
-          <span className="font-semibold text-lg">ERMS</span>
+          <img src="/digiwave-logo.png" alt="Digiwave" className="h-8 w-auto" />
+          <span className="font-semibold text-lg">Digiwave</span>
         </div>
         
         {/* Navigation */}
