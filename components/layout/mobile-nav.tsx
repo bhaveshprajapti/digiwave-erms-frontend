@@ -83,9 +83,10 @@ function MobileNavItem({ item, pathname, onClose, level = 0 }: { item: any, path
   )
 }
 
-export function MobileNav() {
+export function MobileNav({ sections }: { sections?: any[] } = {}) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
+  const sectionsToUse = sections || navigationSections
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -110,7 +111,7 @@ export function MobileNav() {
         {/* Navigation */}
         <nav className="h-[calc(100vh-4rem)] overflow-y-auto p-4">
           <div className="space-y-6">
-            {navigationSections.map((section, sectionIndex) => (
+            {sectionsToUse.map((section, sectionIndex) => (
               <div key={sectionIndex}>
                 {/* Section Title */}
                 <div className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
