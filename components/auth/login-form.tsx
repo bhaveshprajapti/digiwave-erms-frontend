@@ -1,15 +1,16 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Building2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import api from "@/lib/api" // Import the new api instance
+import authService from "@/lib/auth"
 
 export function LoginForm() {
   const router = useRouter()
@@ -18,6 +19,17 @@ export function LoginForm() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [rememberMe, setRememberMe] = useState(false)
+
+  // Load remembered credentials on component mount
+  useEffect(() => {
+    const remembered = authService.getRememberedCredentials()
+    if (remembered) {
+      setUsername(remembered.username)
+      setPassword(remembered.password)
+      setRememberMe(true)
+    }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,35 +37,21 @@ export function LoginForm() {
     setError("") // Clear any previous errors
 
     try {
-      const resp = await api.post("/accounts/login", {
-        username,
-        password
+      const response = await authService.login(username, password, rememberMe)
+      
+      // Show success message
+      toast({
+        title: "Login Successful",
+        description: response.message || "Welcome back!",
       })
-
-      const token = resp.data.token
-      if (!token) throw new Error("No token returned from server.")
-
-      // Store token for authenticated requests
-      localStorage.setItem("authToken", token)
-
-      // The interceptor in `lib/api.ts` will now automatically add the token
-      // to subsequent requests.
-      const userResp = await api.get("/accounts/users/me/")
-
-      if (userResp.data) {
-        localStorage.setItem("user", JSON.stringify(userResp.data))
-        
-        // Redirect based on user role
-        if (userResp.data.is_superuser || userResp.data.is_staff) {
-          // Admin/Staff users go to admin dashboard
-          router.push("/dashboard")
-        } else {
-          // Regular employees go to employee dashboard
-          router.push("/employee-dashboard")
-        }
+      
+      // Redirect based on user role
+      if (response.user.is_superuser || response.user.is_staff) {
+        // Admin/Staff users go to admin dashboard
+        router.push("/dashboard")
       } else {
-        console.error("Failed to fetch user data after login.")
-        router.push("/dashboard") // Fallback
+        // Regular employees go to employee dashboard
+        router.push("/employee-dashboard")
       }
     } catch (err: any) {
       let errorMessage = "An unexpected error occurred."
@@ -67,7 +65,11 @@ export function LoginForm() {
         
         if (statusCode === 400) {
           // Bad request - usually invalid credentials
-          if (errorData.non_field_errors?.[0]) {
+          if (errorData.error) {
+            errorMessage = errorData.error
+          } else if (errorData.details) {
+            errorMessage = errorData.details
+          } else if (errorData.non_field_errors?.[0]) {
             errorMessage = errorData.non_field_errors[0]
           } else if (errorData.username) {
             errorMessage = Array.isArray(errorData.username) ? errorData.username[0] : errorData.username
@@ -77,16 +79,16 @@ export function LoginForm() {
             errorMessage = "Invalid username or password. Please check your credentials and try again."
           }
         } else if (statusCode === 401) {
-          errorMessage = "Authentication failed. Please check your credentials."
+          errorMessage = errorData.error || errorData.details || "Authentication failed. Please check your credentials."
         } else if (statusCode === 403) {
-          errorMessage = "Access denied. Your account may be inactive or suspended."
+          errorMessage = errorData.error || errorData.details || "Access denied. Your account may be inactive or suspended."
         } else if (statusCode === 404) {
-          errorMessage = "User account not found. Please check your username or contact support."
+          errorMessage = errorData.error || errorData.details || "User account not found. Please check your username or contact support."
         } else if (statusCode >= 500) {
-          errorMessage = "Server error. Please try again later or contact support."
+          errorMessage = errorData.error || errorData.details || "Server error. Please try again later or contact support."
           errorTitle = "Server Error"
         } else {
-          errorMessage = errorData.detail || errorData.message || "Login failed. Please try again."
+          errorMessage = errorData.error || errorData.details || errorData.detail || errorData.message || "Login failed. Please try again."
         }
       } else if (err.request) {
         // The request was made but no response was received
@@ -148,6 +150,22 @@ export function LoginForm() {
               className={error ? "border-red-500 focus-visible:ring-red-500" : ""}
             />
           </div>
+          
+          {/* Remember Me Checkbox */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="remember-me"
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+            />
+            <Label
+              htmlFor="remember-me"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Remember me
+            </Label>
+          </div>
+          
           {error && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
               {error}

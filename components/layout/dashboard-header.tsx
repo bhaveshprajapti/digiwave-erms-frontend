@@ -14,30 +14,32 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Bell, LogOut, Settings, User } from "lucide-react"
 import { useEffect, useState } from "react"
 import { MobileNav } from "./mobile-nav"
+import authService, { type User as AuthUser } from "@/lib/auth"
 
 export function DashboardHeader() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
 
   useEffect(() => {
-    const userData = localStorage.getItem("user")
-    if (userData) {
-      setUser(JSON.parse(userData))
-    }
+    const userData = authService.getUserData()
+    setUser(userData)
   }, [])
 
   const handleLogout = () => {
-    localStorage.removeItem("user")
-    router.push("/login")
+    authService.logout()
   }
 
+  const displayName = authService.getUserDisplayName()
+  const fullName = authService.getUserFullName()
+  const userInitial = user?.first_name?.charAt(0) || user?.username?.charAt(0) || 'U'
+
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
       <div className="flex items-center gap-4">
         <MobileNav />
         <div>
-          <h1 className="text-base font-semibold md:text-lg">Welcome back, {user?.name || "User"}</h1>
-          <p className="hidden text-sm text-muted-foreground sm:block">{user?.organization}</p>
+          <h1 className="text-base font-semibold md:text-lg">Welcome back, {displayName}</h1>
+          <p className="hidden text-sm text-muted-foreground sm:block">{user?.organization?.name || user?.role?.name || 'Employee'}</p>
         </div>
       </div>
       <div className="flex items-center gap-2 md:gap-4">
@@ -48,15 +50,15 @@ export function DashboardHeader() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
               <Avatar>
-                <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
+                <AvatarFallback>{userInitial}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user?.name}</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
+                <p className="text-sm font-medium">{fullName}</p>
+                <p className="text-xs text-muted-foreground">{user?.email || user?.username}</p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
