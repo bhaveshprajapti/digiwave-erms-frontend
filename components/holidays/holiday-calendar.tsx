@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { DataTable } from "@/components/common/data-table"
 import { ActionButtons } from "@/components/common/action-buttons"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import Swal from 'sweetalert2'
 
 export function HolidayCalendar() {
   const { holidays, isLoading, addHoliday, updateHoliday, deleteHoliday } = useHolidays()
@@ -23,6 +24,14 @@ export function HolidayCalendar() {
   const [viewOnly, setViewOnly] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<{ date: Date | undefined; title: string }>({ date: undefined, title: "" })
+
+  const formatDateDDMMYYYY = (dateStr: string): string => {
+    if (!dateStr) return ''
+    const parts = dateStr.split('-')
+    if (parts.length !== 3) return dateStr
+    const [yyyy, mm, dd] = parts
+    return `${dd}/${mm}/${yyyy}`
+  }
 
   const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}`
   const byDate = useMemo(() => {
@@ -67,7 +76,7 @@ const openEdit = (h: Holiday, readOnly=false) => {
         return
       }
 if (editing) {
-        await updateHoliday(editing.id, { date: dateStr, title: form.title.trim() })
+        await updateHoliday({ id: editing.id, data: { date: dateStr, title: form.title.trim() } })
         toast({ title: 'Updated', description: 'Holiday updated' })
       } else {
         await addHoliday({ date: dateStr, title: form.title.trim() })
@@ -81,14 +90,28 @@ if (editing) {
     }
   }
 
-  const remove = async () => {
-    if (!editing) return
+const confirmAndDelete = async (id: number, label?: string) => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: label ? `Delete holiday "${label}"? This action cannot be undone!` : 'Delete this holiday? This action cannot be undone!',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    })
+    if (!result.isConfirmed) return false
     try {
-      await deleteHoliday(editing.id)
+      await deleteHoliday(id)
+      Swal.fire('Deleted!', 'The holiday has been deleted successfully.', 'success')
       toast({ title: 'Deleted', description: 'Holiday removed' })
-      setIsModalOpen(false)
-    } catch(e:any) {
+      return true
+    } catch (e:any) {
+      Swal.fire('Error!', 'Failed to delete the holiday. Please try again.', 'error')
       toast({ title: 'Error', description: e?.message || 'Delete failed', variant: 'destructive' })
+      return false
     }
   }
 
@@ -103,7 +126,7 @@ const renderModal = () => (
           <div className="grid grid-cols-4 items-start gap-4">
             <Label className="text-right pt-2">Date</Label>
             <div className="col-span-3">
-              <DatePicker value={form.date} onChange={(d)=>setForm(f=>({ ...f, date: d }))} disabled={viewOnly} />
+<DatePicker value={form.date} onChange={(d)=>setForm(f=>({ ...f, date: d }))} disabled={viewOnly} displayFormat="DD/MM/YYYY" />
             </div>
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
@@ -114,8 +137,21 @@ const renderModal = () => (
           </div>
         </div>
         <DialogFooter>
+          {editing && viewOnly && (
+            <Button variant="outline" onClick={()=>setViewOnly(false)} title="Edit this holiday">
+              Edit
+            </Button>
+          )}
           {editing && !viewOnly && (
-            <Button variant="outline" onClick={remove} className="text-red-600 border-red-200 hover:bg-red-50">
+            <Button
+              variant="outline"
+              onClick={async ()=>{
+                if (!editing) return
+                const ok = await confirmAndDelete(editing.id, editing.title)
+                if (ok) setIsModalOpen(false)
+              }}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
               <Trash2 className="h-4 w-4 mr-2" /> Delete
             </Button>
           )}
@@ -177,15 +213,18 @@ const renderModal = () => (
             <div className="text-xs text-muted-foreground">Click a highlighted date to view holiday; use Add Holiday to create new.</div>
           </div>
           <div>
-            <DataTable<Holiday>
+<DataTable<Holiday>
               columns={[
-                { key: 'date', header: 'Date', sortable: true, sortAccessor: (h:Holiday)=> new Date(h.date).getTime(), cell: (h:Holiday)=> new Date(h.date).toLocaleDateString() },
+                { key: 'date', header: 'Date', sortable: true, sortAccessor: (h:Holiday)=> new Date(h.date).getTime(), cell: (h:Holiday)=> formatDateDDMMYYYY(h.date) },
                 { key: 'title', header: 'Title' },
-                { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (h:Holiday) => (
+{ key: 'actions', header: <span className="block text-center">Actions</span>, cell: (h:Holiday) => (
                   <div className="flex items-center justify-center">
                     <ActionButtons
                       onEdit={() => openEdit(h)}
-                      onDelete={() => deleteHoliday(h.id)}
+                      onDelete={async () => {
+                        const ok = await confirmAndDelete(h.id, h.title)
+                        if (ok && isModalOpen) setIsModalOpen(false)
+                      }}
                     />
                   </div>
                 )}
