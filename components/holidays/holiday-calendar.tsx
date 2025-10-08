@@ -25,6 +25,16 @@ export function HolidayCalendar() {
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<{ date: Date | undefined; title: string }>({ date: undefined, title: "" })
 
+  // Utility functions to handle dates without timezone issues
+  const formatDateToString = (date: Date): string => {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  }
+
+  const parseDateFromString = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+
   const formatDateDDMMYYYY = (dateStr: string): string => {
     if (!dateStr) return ''
     const parts = dateStr.split('-')
@@ -63,14 +73,16 @@ const openCreate = (date?: Date) => {
 const openEdit = (h: Holiday, readOnly=false) => {
     setEditing(h)
     setViewOnly(readOnly)
-    setForm({ date: new Date(h.date), title: h.title })
+    // Fix timezone issue when parsing date from string
+    setForm({ date: parseDateFromString(h.date), title: h.title })
     setIsModalOpen(true)
   }
 
   const save = async () => {
     try {
       setSaving(true)
-      const dateStr = form.date ? form.date.toISOString().split('T')[0] : ""
+      // Fix timezone issue by using local date formatting instead of toISOString()
+      const dateStr = form.date ? formatDateToString(form.date) : ""
       if (!dateStr || !form.title.trim()) {
         toast({ title: 'Validation', description: 'Please enter date and title', variant: 'destructive' });
         return
