@@ -4,7 +4,6 @@ import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { DatePicker } from "@/components/ui/date-picker"
 import { useHolidays } from "@/hooks/use-holidays"
@@ -23,7 +22,7 @@ export function HolidayCalendar() {
   const [editing, setEditing] = useState<Holiday | null>(null)
   const [viewOnly, setViewOnly] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState<{ date: Date | undefined; title: string; description: string }>({ date: undefined, title: "", description: "" })
+  const [form, setForm] = useState<{ date: Date | undefined; title: string }>({ date: undefined, title: "" })
 
   const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}`
   const byDate = useMemo(() => {
@@ -45,17 +44,17 @@ export function HolidayCalendar() {
   const previousMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth()-1, 1))
   const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth()+1, 1))
 
-  const openCreate = (date?: Date) => {
+const openCreate = (date?: Date) => {
     setEditing(null)
     setViewOnly(false)
-    setForm({ date: date ?? new Date(), title: "", description: "" })
+    setForm({ date: date ?? new Date(), title: "" })
     setIsModalOpen(true)
   }
 
-  const openEdit = (h: Holiday, readOnly=false) => {
+const openEdit = (h: Holiday, readOnly=false) => {
     setEditing(h)
     setViewOnly(readOnly)
-    setForm({ date: new Date(h.date), title: h.title, description: h.description || "" })
+    setForm({ date: new Date(h.date), title: h.title })
     setIsModalOpen(true)
   }
 
@@ -67,11 +66,11 @@ export function HolidayCalendar() {
         toast({ title: 'Validation', description: 'Please enter date and title', variant: 'destructive' });
         return
       }
-      if (editing) {
-        await updateHoliday(editing.id, { date: dateStr, title: form.title.trim(), description: form.description.trim() })
+if (editing) {
+        await updateHoliday(editing.id, { date: dateStr, title: form.title.trim() })
         toast({ title: 'Updated', description: 'Holiday updated' })
       } else {
-        await addHoliday({ date: dateStr, title: form.title.trim(), description: form.description.trim() })
+        await addHoliday({ date: dateStr, title: form.title.trim() })
         toast({ title: 'Created', description: 'Holiday created' })
       }
       setIsModalOpen(false)
@@ -93,25 +92,25 @@ export function HolidayCalendar() {
     }
   }
 
-  const renderModal = () => (
+const renderModal = () => (
     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{editing ? (viewOnly ? 'Holiday Details' : 'Edit Holiday') : 'Add Holiday'}</DialogTitle>
           <DialogDescription>Manage a public holiday entry</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label>Date</Label>
-            <DatePicker value={form.date} onChange={(d)=>setForm(f=>({ ...f, date: d }))} inputClassName="h-9" disabled={viewOnly} />
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right pt-2">Date</Label>
+            <div className="col-span-3">
+              <DatePicker value={form.date} onChange={(d)=>setForm(f=>({ ...f, date: d }))} disabled={viewOnly} />
+            </div>
           </div>
-          <div>
-            <Label>Title</Label>
-            <Input value={form.title} onChange={(e)=>setForm(f=>({ ...f, title: e.target.value }))} placeholder="Holiday name" disabled={viewOnly} />
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea value={form.description} onChange={(e)=>setForm(f=>({ ...f, description: e.target.value }))} placeholder="Optional details" disabled={viewOnly} />
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label className="text-right pt-2">Title</Label>
+            <div className="col-span-3">
+              <Input value={form.title} onChange={(e)=>setForm(f=>({ ...f, title: e.target.value }))} placeholder="Holiday name" disabled={viewOnly} />
+            </div>
           </div>
         </div>
         <DialogFooter>
@@ -120,9 +119,9 @@ export function HolidayCalendar() {
               <Trash2 className="h-4 w-4 mr-2" /> Delete
             </Button>
           )}
-          <Button variant="outline" onClick={()=>setIsModalOpen(false)}>Close</Button>
+          <Button variant="outline" onClick={()=>setIsModalOpen(false)}>Cancel</Button>
           {!viewOnly && (
-            <Button onClick={save} disabled={saving}>{editing ? 'Save' : 'Create'}</Button>
+            <Button onClick={save} disabled={saving}>{editing ? 'Save Changes' : 'Add'}</Button>
           )}
         </DialogFooter>
       </DialogContent>
@@ -131,26 +130,30 @@ export function HolidayCalendar() {
 
   return (
     <Card>
-      <CardHeader>
+<CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>Public Holidays</CardTitle>
           <div className="flex items-center gap-2">
             <Button onClick={()=>openCreate()}>
               <Plus className="h-4 w-4 mr-2" /> Add Holiday
             </Button>
-            <Button variant="outline" size="icon" onClick={previousMonth}><ChevronLeft className="h-4 w-4" /></Button>
-            <span className="text-sm font-medium">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
-            <Button variant="outline" size="icon" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="grid gap-6 lg:grid-cols-2">
-          <div className="space-y-4">
-            <div className="grid grid-cols-7 gap-2 text-center text-sm font-medium text-muted-foreground">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={previousMonth}><ChevronLeft className="h-4 w-4" /></Button>
+                <span className="text-sm font-medium">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+                <Button variant="outline" size="icon" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
               {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>(<div key={d}>{d}</div>))}
             </div>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1">
               {Array.from({ length: firstDay }).map((_, i) => (<div key={`e-${i}`} />))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i+1
@@ -160,12 +163,12 @@ export function HolidayCalendar() {
                   <button
                     type="button"
                     key={day}
-                    className={`relative flex h-12 items-center justify-center rounded-lg border text-sm font-medium hover:bg-muted ${holiday ? 'bg-green-50 border-green-200' : ''}`}
+                    className={`relative flex h-10 items-center justify-center rounded-lg border text-xs font-medium hover:bg-muted ${holiday ? 'bg-green-50 border-green-200' : ''}`}
                     onClick={() => holiday ? openEdit(holiday, true) : undefined}
                   >
-                    <span className="absolute top-1 left-1 text-xs text-muted-foreground">{day}</span>
+                    <span className="absolute top-1 left-1 text-[10px] text-muted-foreground">{day}</span>
                     {holiday && (
-                      <span className="text-xs font-medium text-green-700 text-center px-2 truncate max-w-[90%]">{holiday.title}</span>
+                      <span className="text-[10px] font-medium text-green-700 text-center px-2 truncate max-w-[90%]">{holiday.title}</span>
                     )}
                   </button>
                 )
@@ -178,15 +181,12 @@ export function HolidayCalendar() {
               columns={[
                 { key: 'date', header: 'Date', sortable: true, sortAccessor: (h:Holiday)=> new Date(h.date).getTime(), cell: (h:Holiday)=> new Date(h.date).toLocaleDateString() },
                 { key: 'title', header: 'Title' },
-                { key: 'description', header: 'Description', cell: (h:Holiday)=> (h.description || '').slice(0,60) },
                 { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (h:Holiday) => (
-                  <div className="flex items-center justify-center gap-2">
-                    <Button variant="outline" size="sm" onClick={()=>openEdit(h)}>
-                      Edit
-                    </Button>
-                    <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={async()=>{ await deleteHoliday(h.id) }}>
-                      Delete
-                    </Button>
+                  <div className="flex items-center justify-center">
+                    <ActionButtons
+                      onEdit={() => openEdit(h)}
+                      onDelete={() => deleteHoliday(h.id)}
+                    />
                   </div>
                 )}
               ]}
