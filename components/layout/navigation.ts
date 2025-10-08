@@ -69,6 +69,9 @@ export const navigationSections = [
           { href: "/dashboard/leave", label: "Leave Management" },
           { href: "/dashboard/leave/request", label: "Request Leave" },
           { href: "/dashboard/attendance", label: "Attendance" },
+          { href: "/dashboard/admin/attendance", label: "Admin Attendance" },
+          { href: "/dashboard/admin/time-adjustments", label: "Time Adjustments" },
+          { href: "/dashboard/admin/approvals", label: "Approvals" },
           { href: "/dashboard/admin/policies", label: "Leave Policies" },
         ]
       },

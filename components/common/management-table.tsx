@@ -18,6 +18,8 @@ import { ReactNode, useState } from "react"
 import Swal from 'sweetalert2'
 import { DataTable } from "@/components/common/data-table"
 import { ActionButtons } from "@/components/common/action-buttons"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DatePicker } from "@/components/ui/date-picker"
 
 interface ManagementTableProps<T> {
   title: string
@@ -27,8 +29,9 @@ interface ManagementTableProps<T> {
   fields: {
     key: keyof T
     label: string
-    type: "text" | "switch" | "number" | "time"
+    type: "text" | "switch" | "number" | "time" | "select" | "date"
     readonly?: boolean
+    options?: { value: string | number; label: string }[]
   }[]
   onAdd: (data: Partial<T>) => Promise<void>
   onEdit: (id: number, data: Partial<T>) => Promise<void>
@@ -39,7 +42,11 @@ interface ManagementTableProps<T> {
     header: ReactNode
     cell: (item: T, index: number) => ReactNode
     className?: string
+    sortable?: boolean
+    sortAccessor?: (item: T) => any
   }>
+  pageSize?: number
+  headerExtras?: ReactNode
 }
 
 export function ManagementTable<T extends { id: number; is_active?: boolean }>({
@@ -53,6 +60,8 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
   onDelete,
   labelKey,
   tableColumns,
+  pageSize,
+  headerExtras,
 }: ManagementTableProps<T>) {
   const { toast } = useToast()
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -77,7 +86,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
   const validateField = (field: typeof fields[0], value: any): string => {
     // Skip validation for readonly fields
     if ((field as any).readonly) return ''
-    if (field.type === 'text' && (!value || value.toString().trim() === '')) {
+    if ((field.type === 'text' || field.type === 'date') && (!value || value.toString().trim() === '')) {
       return `${field.label} is required`
     }
     if (field.type === 'time' && (!value || value.toString().trim() === '')) {
@@ -257,6 +266,25 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
     }
   }
 
+  const toDateObj = (s?: string): Date | undefined => {
+    if (!s) return undefined
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!m) return undefined
+    const yyyy = parseInt(m[1], 10)
+    const mm = parseInt(m[2], 10)
+    const dd = parseInt(m[3], 10)
+    const d = new Date(yyyy, mm - 1, dd)
+    if (d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd) return d
+    return undefined
+  }
+  const toYMD = (d?: Date): string => {
+    if (!d) return ''
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    return `${yyyy}-${mm}-${dd}`
+  }
+
   const renderFormField = (field: typeof fields[0], value: any, onChange: (value: any) => void) => {
     switch (field.type) {
       case "switch":
@@ -271,6 +299,19 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
               {Boolean(value) ? "Active" : "Inactive"}
             </span>
           </div>
+        )
+      case "select":
+        return (
+          <Select value={String(value ?? '')} onValueChange={(v) => onChange(isNaN(Number(v)) ? v : Number(v))}>
+            <SelectTrigger id={String(field.key)}>
+              <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+            </SelectTrigger>
+            <SelectContent>
+              {(field.options ?? []).map(opt => (
+                <SelectItem key={String(opt.value)} value={String(opt.value)}>{opt.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )
       case "number":
         return (
@@ -287,6 +328,14 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
             value={value as string}
             onChange={(t: string) => onChange(t)}
             withSeconds
+          />
+        )
+      case "date":
+        return (
+          <DatePicker
+            value={toDateObj(value as string)}
+            onChange={(d) => onChange(toYMD(d))}
+            placeholder="YYYY-MM-DD"
           />
         )
       default:
@@ -334,32 +383,35 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-2xl font-bold tracking-tight truncate">{title}</h2>
           <p className="text-muted-foreground">{description}</p>
         </div>
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add New
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New {title}</DialogTitle>
-              <DialogDescription>{description}</DialogDescription>
-            </DialogHeader>
-            {renderForm()}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddOpen(false)}>
-                Cancel
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {headerExtras}
+          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add New
               </Button>
-              <Button onClick={handleAdd}>Add</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New {title}</DialogTitle>
+                <DialogDescription>{description}</DialogDescription>
+              </DialogHeader>
+              {renderForm()}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAdd}>Add</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
       <div className="mt-4">
         <DataTable<T>
@@ -369,6 +421,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
               : fields.map((field) => ({
                   key: String(field.key),
                   header: field.label,
+                  sortable: field.type !== 'switch',
                   cell: (item: T) => (
                     field.type === 'switch' ? (
                       <div className="flex items-center space-x-2">
@@ -388,6 +441,10 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
                     ) : (
                       (() => {
                         const v = (item as any)[field.key]
+                        if (field.type === 'select' && field.options) {
+                          const found = field.options.find(o => String(o.value) === String(v))
+                          return found ? found.label : String(v ?? '')
+                        }
                         if (typeof v === 'boolean') return v ? 'Yes' : 'No'
                         return String(v ?? '')
                       })()
@@ -415,6 +472,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
           data={items}
           getRowKey={(i) => (i as any).id}
           striped
+          pageSize={typeof (pageSize as any) === 'number' ? (pageSize as any) : undefined}
         />
       </div>
 

@@ -36,8 +36,8 @@ function NavItem({ item, pathname, level = 0 }: { item: any, pathname: string, l
           className={cn(
             "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
 hasActiveChild
-              ? "bg-white/10 text-white"
-              : "text-white/70 hover:bg-white/10 hover:text-white",
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
             level > 0 && "ml-4"
           )}
         >
@@ -54,8 +54,8 @@ hasActiveChild
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
 isPathActive(pathname, child.href)
-                    ? "bg-white/10 text-white"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
                 <div className="h-1 w-1 rounded-full bg-current opacity-60" />
@@ -74,8 +74,8 @@ isPathActive(pathname, child.href)
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
 isActive
-          ? "bg-white/10 text-white"
-          : "text-white/70 hover:bg-white/10 hover:text-white",
+          ? "bg-muted text-foreground"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
         level > 0 && "ml-4"
       )}
     >

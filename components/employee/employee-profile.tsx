@@ -259,23 +259,61 @@ export function EmployeeProfile() {
         </div>
       </div>
 
-      {/* Pending Requests Alert */}
+      {/* Requests Status Alert */}
       {pendingRequests.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
-              <div>
-                <p className="font-medium text-orange-800">
-                  You have {pendingRequests.length} pending profile update request(s)
-                </p>
-                <p className="text-sm text-orange-700">
-                  Your changes are waiting for admin approval
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="space-y-3">
+          {pendingRequests.filter(r => r.status === 'pending').length > 0 && (
+            <Card className="border-orange-200 bg-orange-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="h-5 w-5 text-orange-600" />
+                  <div>
+                    <p className="font-medium text-orange-800">
+                      You have {pendingRequests.filter(r => r.status === 'pending').length} pending profile update request(s)
+                    </p>
+                    <p className="text-sm text-orange-700">
+                      Your changes are waiting for admin approval
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {pendingRequests.filter(r => r.status === 'approved').length > 0 && (
+            <Card className="border-green-200 bg-green-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium text-green-800">
+                      {pendingRequests.filter(r => r.status === 'approved').length} profile update request(s) approved
+                    </p>
+                    <p className="text-sm text-green-700">
+                      Your profile updates have been approved and applied
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {pendingRequests.filter(r => r.status === 'rejected').length > 0 && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                  <div>
+                    <p className="font-medium text-red-800">
+                      {pendingRequests.filter(r => r.status === 'rejected').length} profile update request(s) rejected
+                    </p>
+                    <p className="text-sm text-red-700">
+                      Some of your profile updates were not approved
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
       <Tabs defaultValue="profile" className="space-y-6">
@@ -581,7 +619,13 @@ export function EmployeeProfile() {
                         <div className="text-right">
                           <Badge 
                             variant="secondary"
-                            className="bg-orange-100 text-orange-800 border-orange-200"
+                            className={`capitalize ${
+                              request.status === 'approved' 
+                                ? 'bg-green-100 text-green-800 border-green-200'
+                                : request.status === 'rejected'
+                                ? 'bg-red-100 text-red-800 border-red-200'
+                                : 'bg-orange-100 text-orange-800 border-orange-200'
+                            }`}
                           >
                             {request.status}
                           </Badge>
