@@ -1,8 +1,8 @@
-import { axiosInstance } from "../axios"
+import api from "@/lib/api"
 import { AxiosResponse } from "axios"
 import { LeaveRequest } from "@/lib/schemas"
 
-const base = "/api/v1/attendance/leave-requests/"
+const base = "/attendance/leave-requests/"
 
 export interface LeaveRequestFilters {
   status?: string
@@ -19,30 +19,30 @@ export const getLeaveRequests = async (filters: LeaveRequestFilters = {}): Promi
   if (filters.search) params.set('search', filters.search)
 
   const url = params.toString() ? `${base}?${params.toString()}` : base
-  const res: AxiosResponse<LeaveRequest[]> = await axiosInstance.get(url)
+  const res: AxiosResponse<LeaveRequest[]> = await api.get(url)
   return res.data
 }
 
 export const createLeaveRequest = async (data: Omit<LeaveRequest, "id" | "created_at" | "status" | "approver" | "rejection_reason">): Promise<LeaveRequest> => {
-  const res: AxiosResponse<LeaveRequest> = await axiosInstance.post(base, data)
+  const res: AxiosResponse<LeaveRequest> = await api.post(base, data)
   return res.data
 }
 
 export const updateLeaveRequest = async (id: number, data: Partial<Omit<LeaveRequest, "id">>): Promise<LeaveRequest> => {
-  const res: AxiosResponse<LeaveRequest> = await axiosInstance.patch(`${base}${id}/`, data)
+  const res: AxiosResponse<LeaveRequest> = await api.patch(`${base}${id}/`, data)
   return res.data
 }
 
 export const deleteLeaveRequest = async (id: number): Promise<void> => {
-  await axiosInstance.delete(`${base}${id}/`)
+  await api.delete(`${base}${id}/`)
 }
 
 export const approveLeaveRequest = async (id: number): Promise<{ message: string }> => {
-  const res: AxiosResponse<{ message: string }> = await axiosInstance.post(`${base}${id}/approve/`)
+  const res: AxiosResponse<{ message: string }> = await api.post(`${base}${id}/approve/`)
   return res.data
 }
 
 export const rejectLeaveRequest = async (id: number, reason?: string): Promise<{ message: string }> => {
-  const res: AxiosResponse<{ message: string }> = await axiosInstance.post(`${base}${id}/reject/`, { reason })
+  const res: AxiosResponse<{ message: string }> = await api.post(`${base}${id}/reject/`, { reason })
   return res.data
 }

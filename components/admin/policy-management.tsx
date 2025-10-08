@@ -197,7 +197,7 @@ setLtIsPaid(t.is_paid)
     setLpNoticeDays(p.notice_days)
     setLpMaxConsec(p.max_consecutive)
     setLpActive(p.is_active)
-setLpLeaveTypeIds(p.leave_types)
+    setLpLeaveTypeIds(p.leave_types)
     setLpLeaveTypeValues(p.leave_types.map(String))
     setLpEditOpen(true)
   }
@@ -422,9 +422,9 @@ setLpLeaveTypeIds(p.leave_types)
 
                   <div className="space-y-2">
                     <Label>Leave Types</Label>
-<MultiSelect
+                    <MultiSelect
                       options={leaveTypes.map<MultiSelectOption>((t) => ({ label: `${t.name} (${t.code})`, value: String(t.id) }))}
-                    value={lpLeaveTypeValues}
+                      value={lpLeaveTypeValues}
                       onChange={(vals) => {
                         setLpLeaveTypeValues(vals)
                         setLpLeaveTypeIds(vals.map((v) => parseInt(v, 10)).filter((n) => Number.isFinite(n)))
@@ -432,7 +432,7 @@ setLpLeaveTypeIds(p.leave_types)
                       }}
                       placeholder="Select leave types"
                     />
-                  {lpErrors.leave_types && <p className="text-sm text-red-500">{lpErrors.leave_types}</p>}
+                    {lpErrors.leave_types && <p className="text-sm text-red-500">{lpErrors.leave_types}</p>}
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
