@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { DataTable } from "@/components/common/data-table"
+import { calculateAttendanceStatus } from "@/lib/utils/attendance-status"
 
 export function AttendanceHistory() {
   const { toast } = useToast()
@@ -49,9 +50,101 @@ export function AttendanceHistory() {
       <CardContent>
         <DataTable
           columns={[
-            { key: 'date', header: 'Date', sortable: true },
-            { key: 'total_hours', header: 'Total Hours' },
-            { key: 'notes', header: 'Notes', cell: (r: any)=> <span className="text-sm">{r.notes ?? '-'}</span> },
+            { 
+              key: 'date', 
+              header: 'Date', 
+              sortable: true, 
+              cell: (r: any) => (
+                <div className="font-medium">
+                  {new Date(r.date).toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric'
+                  })}
+                </div>
+              )
+            },
+            {
+              key: 'sessions',
+              header: 'Sessions',
+              cell: (r: any) => {
+                const sessions = r.sessions || []
+                const completed = sessions.filter((s: any) => s.check_out).length
+                const active = sessions.length - completed
+                return (
+                  <div className="text-sm">
+                    <span className="font-medium">{sessions.length} total</span>
+                    {completed > 0 && <span className="text-green-600 ml-2">{completed} done</span>}
+                    {active > 0 && <span className="text-blue-600 ml-2">{active} active</span>}
+                  </div>
+                )
+              }
+            },
+            { 
+              key: 'total_hours', 
+              header: 'Total Hours',
+              cell: (r: any) => (
+                <div className="font-mono text-sm">
+                  {r.total_hours || '0:00:00'}
+                </div>
+              )
+            },
+            {
+              key: 'status',
+              header: 'Status',
+              cell: (r: any) => {
+                const sessions = r.sessions || []
+                const hasActive = sessions.some((s: any) => !s.check_out)
+                
+                // Calculate proper status using the new utility
+                const [statusDisplay, variant] = (() => {
+                  if (hasActive) {
+                    return ['Active', 'default'] as const
+                  }
+                  
+                  // For completed sessions, we'll compute the status based on business rules
+                  // This is a simplified sync version - in a real scenario we'd use async
+                  if (sessions.length === 0) {
+                    return ['Absent', 'destructive'] as const
+                  }
+                  
+                  const totalHours = r.total_hours || '0:00:00'
+                  const [hours, minutes] = totalHours.split(':')
+                  const totalMinutes = parseInt(hours) * 60 + parseInt(minutes || '0')
+                  
+                  if (totalMinutes >= 240) { // 4+ hours
+                    // TODO: Check if late based on shift timing
+                    return ['Present', 'secondary'] as const
+                  } else if (totalMinutes >= 210) { // 3.5+ hours
+                    return ['Half Day', 'outline'] as const
+                  } else {
+                    return ['Absent', 'destructive'] as const
+                  }
+                })()
+                
+                return (
+                  <div className="flex items-center gap-2">
+                    <div className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      variant === 'default' ? 'bg-primary text-primary-foreground' :
+                      variant === 'secondary' ? 'bg-green-100 text-green-800' :
+                      variant === 'outline' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {statusDisplay}
+                    </div>
+                  </div>
+                )
+              }
+            },
+            { 
+              key: 'notes', 
+              header: 'Notes', 
+              cell: (r: any) => (
+                <span className="text-sm text-muted-foreground">
+                  {r.notes || '-'}
+                </span>
+              )
+            },
           ]}
           data={items as any}
           getRowKey={(i: any) => i.id}

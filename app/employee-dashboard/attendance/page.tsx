@@ -10,7 +10,7 @@ export default function EmployeeAttendancePage() {
         <p className="text-muted-foreground">Track your daily attendance and work hours</p>
       </div>
       <AttendanceClockCard />
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
         <AttendanceCalendar />
         <AttendanceHistory />
       </div>

@@ -67,3 +67,52 @@ export const updateAttendance = async (id: number, data: Partial<AttendanceDTO>)
 export const deleteAttendance = async (id: number): Promise<void> => {
   await api.delete(`${base}${id}/`)
 }
+
+// New check-in/check-out endpoints
+export interface CheckInData {
+  location?: {
+    lat: number
+    lng: number
+  }
+}
+
+export interface CheckInResponse {
+  message: string
+  check_in_time: string
+  session_count: number
+}
+
+export interface CheckOutResponse {
+  message: string
+  check_out_time: string
+  session_count: number
+  total_hours: string
+  break_time: string
+}
+
+export interface AttendanceStatus {
+  date: string
+  is_checked_in: boolean
+  total_sessions: number
+  completed_sessions: number
+  total_hours: string
+  last_check_in?: string
+  last_check_out?: string
+  break_time: string
+  is_on_leave: boolean
+}
+
+export const checkIn = async (data: CheckInData = {}): Promise<CheckInResponse> => {
+  const res: AxiosResponse<CheckInResponse> = await api.post(`${base}check_in/`, data)
+  return res.data
+}
+
+export const checkOut = async (data: CheckInData = {}): Promise<CheckOutResponse> => {
+  const res: AxiosResponse<CheckOutResponse> = await api.post(`${base}check_out/`, data)
+  return res.data
+}
+
+export const getAttendanceStatus = async (): Promise<AttendanceStatus> => {
+  const res: AxiosResponse<AttendanceStatus> = await api.get(`${base}status/`)
+  return res.data
+}
