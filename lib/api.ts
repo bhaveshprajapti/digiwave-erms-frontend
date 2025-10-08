@@ -57,7 +57,6 @@ api.interceptors.request.use(
 // Response interceptor with auto token refresh
 api.interceptors.response.use(
   (response) => {
-    console.log('Response:', response.data);
     return response;
   },
   async (error) => {

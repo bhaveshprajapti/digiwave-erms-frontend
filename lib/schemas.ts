@@ -65,3 +65,57 @@ export interface Holiday {
   title: string
   description?: string | null
 }
+
+// Leave Management
+export interface LeaveType {
+  id: number
+  name: string
+  code: string
+  is_paid: boolean
+  description?: string | null
+  is_active: boolean
+  created_at?: string
+}
+
+export interface LeavePolicy {
+  id: number
+  name: string
+  leave_types: number[]
+  applicable_roles?: number[]
+  annual_quota: number
+  monthly_accrual: string
+  carry_forward_limit: number
+  notice_days: number
+  max_consecutive: number
+  is_active: boolean
+  created_at?: string
+}
+
+export interface LeaveBalance {
+  id: number
+  user: number
+  leave_type: number
+  year: number
+  opening_balance: string
+  used: string
+  carried_forward: string
+  policy?: number | null
+  updated_at?: string
+}
+
+export interface LeaveRequest {
+  id: number
+  user: number
+  leave_type: number
+  start_date: string // YYYY-MM-DD
+  end_date: string // YYYY-MM-DD
+  duration_days: string
+  half_day_type?: string | null
+  reason: string
+  document?: string | null
+  status?: number | null
+  approver?: number | null
+  rejection_reason?: string | null
+  organization: number
+  created_at?: string
+}

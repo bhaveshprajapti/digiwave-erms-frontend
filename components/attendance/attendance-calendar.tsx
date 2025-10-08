@@ -1,24 +1,105 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-
-const attendanceData: Record<string, "present" | "absent" | "late" | "half-day" | "leave"> = {
-  "2025-10-01": "present",
-  "2025-10-02": "present",
-  "2025-10-03": "late",
-  "2025-10-04": "present",
-  "2025-10-05": "present",
-  "2025-10-08": "leave",
-  "2025-10-09": "leave",
-  "2025-10-10": "present",
-  "2025-10-11": "half-day",
-}
+import { SessionDetailsModal } from "./session-details-modal"
+import { listAttendances } from "@/lib/api/attendances"
+import { authService } from "@/lib/auth"
+import { calculateAttendanceStatus, clearAttendanceStatusCache } from "@/lib/utils/attendance-status"
 
 export function AttendanceCalendar() {
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 9, 1)) // October 2025
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [attendanceData, setAttendanceData] = useState<Record<string, any>>({})
+  const [loading, setLoading] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [userId, setUserId] = useState<number | undefined>()
+
+  useEffect(() => {
+    const user = authService.getUserData()
+    if (user?.id) {
+      setUserId(user.id)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (userId) {
+      loadAttendanceData()
+    }
+  }, [currentDate, userId])
+
+  const loadAttendanceData = async () => {
+    if (!userId) return
+    
+    setLoading(true)
+    try {
+      const year = currentDate.getFullYear()
+      const month = currentDate.getMonth()
+      const startDate = new Date(year, month, 1).toISOString().slice(0, 10)
+      const endDate = new Date(year, month + 1, 0).toISOString().slice(0, 10)
+      
+      const data = await listAttendances({
+        user: userId,
+        start_date: startDate,
+        end_date: endDate,
+      })
+      
+      const attendanceMap: Record<string, any> = {}
+      
+      // Process each attendance record with proper status calculation
+      for (const record of data.results) {
+        const sessions = record.sessions || []
+        
+        try {
+          // Use the new attendance status calculation
+          const statusResult = await calculateAttendanceStatus(
+            sessions,
+            record.date,
+            record.total_hours,
+            false // TODO: Check if user is on leave for this date
+          )
+          
+          attendanceMap[record.date] = {
+            status: statusResult.status,
+            reason: statusResult.reason,
+            sessions,
+            total_hours: record.total_hours,
+            notes: record.notes
+          }
+        } catch (error) {
+          console.error(`Error calculating status for ${record.date}:`, error)
+          // Fallback to basic calculation
+          let status = "absent"
+          if (sessions.length > 0) {
+            const hasActiveSession = sessions.some((s: any) => !s.check_out)
+            status = hasActiveSession ? "present" : "present"
+          }
+          
+          attendanceMap[record.date] = {
+            status,
+            sessions,
+            total_hours: record.total_hours,
+            notes: record.notes
+          }
+        }
+      }
+      
+      setAttendanceData(attendanceMap)
+    } catch (error) {
+      console.error('Error loading attendance data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDateClick = (dateStr: string) => {
+    if (attendanceData[dateStr]) {
+      setSelectedDate(dateStr)
+      setModalOpen(true)
+    }
+  }
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear()
@@ -50,73 +131,112 @@ export function AttendanceCalendar() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Attendance Calendar</CardTitle>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={previousMonth}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium">
-              {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-            </span>
-            <Button variant="outline" size="icon" onClick={nextMonth}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="grid grid-cols-7 gap-2 text-center text-sm font-medium text-muted-foreground">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-              <div key={day}>{day}</div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-2">
-            {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`empty-${i}`} />
-            ))}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1
-              const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-              const status = attendanceData[dateStr]
-              return (
-                <div
-                  key={day}
-                  className="relative flex h-10 items-center justify-center rounded-lg border text-sm font-medium hover:bg-muted"
-                >
-                  {day}
-                  {status && <div className={`absolute bottom-1 h-1 w-1 rounded-full ${getStatusColor(status)}`} />}
-                </div>
-              )
-            })}
-          </div>
-          <div className="flex flex-wrap gap-3 pt-2 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="h-3 w-3 rounded-full bg-green-500" />
-              <span>Present</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="h-3 w-3 rounded-full bg-orange-500" />
-              <span>Late</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="h-3 w-3 rounded-full bg-yellow-500" />
-              <span>Half-day</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="h-3 w-3 rounded-full bg-blue-500" />
-              <span>Leave</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="h-3 w-3 rounded-full bg-red-500" />
-              <span>Absent</span>
+    <>
+      <Card className="h-fit">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Attendance Calendar</CardTitle>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={previousMonth} disabled={loading}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[140px] text-center">
+                {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </span>
+              <Button variant="outline" size="icon" onClick={nextMonth} disabled={loading}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-3">
+            {/* Days of week header */}
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <div key={day} className="p-1">{day}</div>
+              ))}
+            </div>
+            
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: firstDay }).map((_, i) => (
+                <div key={`empty-${i}`} className="h-8" />
+              ))}
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                const day = i + 1
+                const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+                const attendanceInfo = attendanceData[dateStr]
+                const hasData = !!attendanceInfo
+                const today = new Date().toISOString().slice(0, 10) === dateStr
+                
+                return (
+                  <div
+                    key={day}
+                    className={`
+                      relative flex h-8 items-center justify-center rounded text-xs font-medium transition-colors
+                      ${
+                        hasData 
+                          ? "cursor-pointer hover:bg-muted border hover:border-primary/50 bg-muted/20" 
+                          : "text-muted-foreground"
+                      }
+                      ${
+                        today 
+                          ? "ring-1 ring-primary ring-offset-1" 
+                          : ""
+                      }
+                    `}
+                    onClick={() => hasData && handleDateClick(dateStr)}
+                    title={hasData ? `Click to view sessions for ${dateStr}` : undefined}
+                  >
+                    {day}
+                    {attendanceInfo && (
+                      <div className={`absolute bottom-0.5 right-0.5 h-1.5 w-1.5 rounded-full ${getStatusColor(attendanceInfo.status)}`} />
+                    )}
+                    {loading && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+                        <div className="h-2 w-2 animate-pulse bg-muted-foreground rounded-full" />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            
+            {/* Legend */}
+            <div className="flex flex-wrap gap-2 pt-2 text-xs border-t">
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-green-500" />
+                <span>Present</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-orange-500" />
+                <span>Late</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-yellow-500" />
+                <span>Half-day</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-blue-500" />
+                <span>Leave</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-red-500" />
+                <span>Absent</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Session Details Modal */}
+      <SessionDetailsModal 
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        selectedDate={selectedDate}
+        userId={userId}
+      />
+    </>
   )
 }
