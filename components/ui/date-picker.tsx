@@ -14,20 +14,21 @@ interface DatePickerProps {
   disabled?: boolean
   className?: string
   inputClassName?: string
+  displayFormat?: 'MM-DD-YYYY' | 'DD/MM/YYYY'
 }
 
-function formatDateMMDDYYYY(date: Date | undefined) {
+function formatDate(date: Date | undefined, fmt: 'MM-DD-YYYY' | 'DD/MM/YYYY' = 'MM-DD-YYYY') {
   if (!date) return ''
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
   const dd = String(date.getDate()).padStart(2, '0')
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
   const yyyy = date.getFullYear()
-  return `${mm}-${dd}-${yyyy}`
+  return fmt === 'DD/MM/YYYY' ? `${dd}/${mm}/${yyyy}` : `${mm}-${dd}-${yyyy}`
 }
 
-function parseInputToDate(text: string): Date | undefined {
+function parseInputToDate(text: string, preferDMY = false): Date | undefined {
   const s = text.trim()
   if (!s) return undefined
-  // Try YYYY-MM-DD or YYYY/MM/DD
+  // Try ISO-like YYYY-MM-DD or YYYY/MM/DD
   let m = s.match(/^(\d{4})[-\/]?(\d{1,2})[-\/]?(\d{1,2})$/)
   if (m) {
     const yyyy = parseInt(m[1], 10)
@@ -36,26 +37,38 @@ function parseInputToDate(text: string): Date | undefined {
     const d = new Date(yyyy, mm - 1, dd)
     if (d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd) return d
   }
-  // Try MM-DD-YYYY or MM/DD/YYYY
-  m = s.match(/^(\d{1,2})[-\/]?(\d{1,2})[-\/]?(\d{4})$/)
-  if (m) {
-    const mm = parseInt(m[1], 10)
-    const dd = parseInt(m[2], 10)
-    const yyyy = parseInt(m[3], 10)
-    const d = new Date(yyyy, mm - 1, dd)
-    if (d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd) return d
+  // Depending on preference, try DD/MM/YYYY before MM/DD/YYYY
+  if (preferDMY) {
+    m = s.match(/^(\d{1,2})[-\/]?(\d{1,2})[-\/]?(\d{4})$/)
+    if (m) {
+      const dd = parseInt(m[1], 10)
+      const mm = parseInt(m[2], 10)
+      const yyyy = parseInt(m[3], 10)
+      const d = new Date(yyyy, mm - 1, dd)
+      if (d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd) return d
+    }
+  } else {
+    // Try MM-DD-YYYY or MM/DD/YYYY
+    m = s.match(/^(\d{1,2})[-\/]?(\d{1,2})[-\/]?(\d{4})$/)
+    if (m) {
+      const mm = parseInt(m[1], 10)
+      const dd = parseInt(m[2], 10)
+      const yyyy = parseInt(m[3], 10)
+      const d = new Date(yyyy, mm - 1, dd)
+      if (d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd) return d
+    }
   }
   return undefined
 }
 
-export function DatePicker({ value, onChange, placeholder = "MM-DD-YYYY", disabled, className, inputClassName }: DatePickerProps) {
+export function DatePicker({ value, onChange, placeholder, disabled, className, inputClassName, displayFormat = 'MM-DD-YYYY' }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const [text, setText] = React.useState<string>(formatDateMMDDYYYY(value))
+  const [text, setText] = React.useState<string>(formatDate(value, displayFormat))
   const isDisabled = Boolean(disabled)
 
   React.useEffect(() => {
-    setText(formatDateMMDDYYYY(value))
-  }, [value])
+    setText(formatDate(value, displayFormat))
+  }, [value, displayFormat])
 
   React.useEffect(() => {
     if (isDisabled) setOpen(false)
@@ -63,7 +76,7 @@ export function DatePicker({ value, onChange, placeholder = "MM-DD-YYYY", disabl
 
   const commitText = () => {
     if (isDisabled) return
-    const parsed = parseInputToDate(text)
+    const parsed = parseInputToDate(text, displayFormat === 'DD/MM/YYYY')
     onChange?.(parsed)
   }
 
@@ -87,7 +100,7 @@ export function DatePicker({ value, onChange, placeholder = "MM-DD-YYYY", disabl
                 setOpen(false)
               }
             }}
-            placeholder={placeholder}
+            placeholder={placeholder ?? (displayFormat === 'DD/MM/YYYY' ? 'DD/MM/YYYY' : 'MM-DD-YYYY')}
             disabled={isDisabled}
             className={cn("ps-10", inputClassName)}
           />

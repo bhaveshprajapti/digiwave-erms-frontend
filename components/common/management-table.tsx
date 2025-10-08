@@ -14,7 +14,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 import { Plus } from "lucide-react"
-import { useState } from "react"
+import { ReactNode, useState } from "react"
 import Swal from 'sweetalert2'
 import { DataTable } from "@/components/common/data-table"
 import { ActionButtons } from "@/components/common/action-buttons"
@@ -34,6 +34,12 @@ interface ManagementTableProps<T> {
   onEdit: (id: number, data: Partial<T>) => Promise<void>
   onDelete: (id: number) => Promise<void>
   labelKey?: keyof T // which field to display as the item's label (defaults to 'name')
+  tableColumns?: Array<{
+    key: string
+    header: ReactNode
+    cell: (item: T, index: number) => ReactNode
+    className?: string
+  }>
 }
 
 export function ManagementTable<T extends { id: number; is_active?: boolean }>({
@@ -46,6 +52,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
   onEdit,
   onDelete,
   labelKey,
+  tableColumns,
 }: ManagementTableProps<T>) {
   const { toast } = useToast()
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -145,9 +152,25 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
         description: "Item added successfully",
       })
     } catch (error: any) {
+      // Try to parse backend validation errors and map to fields
+      let description = error?.message || "Failed to add item"
+      try {
+        const data = JSON.parse(error?.message)
+        if (data && typeof data === 'object') {
+          const newErrors: Record<string, string> = {}
+          Object.keys(data).forEach((k) => {
+            const msg = Array.isArray(data[k]) ? data[k][0] : data[k]
+            if (typeof msg === 'string') newErrors[k] = msg
+          })
+          setErrors(prev => ({ ...prev, ...newErrors }))
+          if (newErrors['name']) {
+            description = newErrors['name']
+          }
+        }
+      } catch {}
       toast({
         title: "Error",
-        description: error.message || "Failed to add item",
+        description,
         variant: "destructive",
       })
     }
@@ -170,10 +193,23 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
         title: "Success",
         description: "Item updated successfully",
       })
-    } catch (error) {
+    } catch (error: any) {
+      let description = "Failed to update item"
+      try {
+        const data = JSON.parse(error?.message)
+        if (data && typeof data === 'object') {
+          const newErrors: Record<string, string> = {}
+          Object.keys(data).forEach((k) => {
+            const msg = Array.isArray(data[k]) ? data[k][0] : data[k]
+            if (typeof msg === 'string') newErrors[k] = msg
+          })
+          setErrors(prev => ({ ...prev, ...newErrors }))
+          if (newErrors['name']) description = newErrors['name']
+        }
+      } catch {}
       toast({
         title: "Error",
-        description: "Failed to update item",
+        description,
         variant: "destructive",
       })
     }
@@ -328,34 +364,36 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
       <div className="mt-4">
         <DataTable<T>
           columns={[
-            ...fields.map((field) => ({
-              key: String(field.key),
-              header: field.label,
-              cell: (item: T) => (
-                field.type === 'switch' ? (
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={Boolean((item as any)[field.key])}
-                      onCheckedChange={async (checked) => {
-                        try {
-                          await onEdit((item as any).id, { [field.key]: checked } as Partial<T>)
-                          toast({ title: 'Success', description: 'Status updated successfully' })
-                        } catch (error) {
-                          toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
-                        }
-                      }}
-                    />
-                    <span className="text-sm text-muted-foreground">{Boolean((item as any)[field.key]) ? 'Active' : 'Inactive'}</span>
-                  </div>
-                ) : (
-                  (() => {
-                    const v = (item as any)[field.key]
-                    if (typeof v === 'boolean') return v ? 'Yes' : 'No'
-                    return String(v ?? '')
-                  })()
-                )
-              )
-            })),
+            ...(Array.isArray(tableColumns) && tableColumns.length > 0
+              ? tableColumns
+              : fields.map((field) => ({
+                  key: String(field.key),
+                  header: field.label,
+                  cell: (item: T) => (
+                    field.type === 'switch' ? (
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={Boolean((item as any)[field.key])}
+                          onCheckedChange={async (checked) => {
+                            try {
+                              await onEdit((item as any).id, { [field.key]: checked } as Partial<T>)
+                              toast({ title: 'Success', description: 'Status updated successfully' })
+                            } catch (error) {
+                              toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+                            }
+                          }}
+                        />
+                        <span className="text-sm text-muted-foreground">{Boolean((item as any)[field.key]) ? 'Active' : 'Inactive'}</span>
+                      </div>
+                    ) : (
+                      (() => {
+                        const v = (item as any)[field.key]
+                        if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+                        return String(v ?? '')
+                      })()
+                    )
+                  )
+                }))),
             {
               key: 'actions',
               header: <span className="block text-center">Actions</span>,
