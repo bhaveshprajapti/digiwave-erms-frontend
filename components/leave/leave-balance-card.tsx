@@ -1,43 +1,60 @@
 "use client"
+
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Calendar, Heart, Plane, Clock } from "lucide-react"
-
-const leaveBalances = [
-  { type: "Casual Leave", total: 18, used: 5, remaining: 13, icon: Calendar, color: "primary" as const },
-  { type: "Sick Leave", total: 12, used: 2, remaining: 10, icon: Heart, color: "success" as const },
-  { type: "Annual Leave", total: 15, used: 8, remaining: 7, icon: Plane, color: "info" as const },
-  { type: "Flex Allowance", total: 12, used: 3, remaining: 9, icon: Clock, color: "warning" as const },
-]
+import { getLeaveBalances } from "@/lib/api/leave-balances"
+import { getLeaveTypes } from "@/lib/api/leave-types"
+import { authService } from "@/lib/auth"
 
 export function LeaveBalanceCard() {
+  const userId = useMemo(() => authService.getUserData()?.id, [])
+  const [rows, setRows] = useState<any[]>([])
+  const [typeMap, setTypeMap] = useState<Record<number, string>>({})
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const [balances, types] = await Promise.all([getLeaveBalances(), getLeaveTypes()])
+        const tm: Record<number, string> = {}
+        types.forEach(t => tm[t.id] = t.name)
+        setTypeMap(tm)
+        setRows((balances || []).filter(b => Number(b.user) === Number(userId)))
+      } catch {}
+    })()
+  }, [userId])
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {leaveBalances.map((leave) => (
-        <Card key={leave.type} className="border-l-4 border-l-primary bg-gradient-to-br from-card to-muted/20">
-          <CardContent className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">{leave.type}</p>
+      {rows.map((b) => {
+        const total = Number(b.opening_balance) + Number(b.carried_forward)
+        const used = Number(b.used)
+        const remaining = Math.max(0, total - used)
+        const percent = total > 0 ? (remaining / total) * 100 : 0
+        return (
+          <Card key={b.id} className="border-l-4 border-l-primary bg-gradient-to-br from-card to-muted/20">
+            <CardContent className="p-6">
+              <div className="mb-4">
+                <p className="text-sm font-medium text-muted-foreground">{typeMap[b.leave_type] ?? `Type #${b.leave_type}`}</p>
                 <div className="flex items-baseline gap-2 mt-2">
-                  <span className="text-3xl font-bold">{leave.remaining}</span>
-                  <span className="text-sm text-muted-foreground">of {leave.total}</span>
+                  <span className="text-3xl font-bold">{remaining}</span>
+                  <span className="text-sm text-muted-foreground">of {total}</span>
                 </div>
               </div>
-              <div className="rounded-full bg-gradient-to-br from-primary/10 to-secondary/5 p-3">
-                <leave.icon className="h-5 w-5 text-primary" />
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Used: {used}</span>
+                  <span>{Math.round(percent)}%</span>
+                </div>
+                <Progress value={percent} className="h-2" />
               </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Used: {leave.used}</span>
-                <span>{Math.round((leave.remaining / leave.total) * 100)}%</span>
-              </div>
-              <Progress value={(leave.remaining / leave.total) * 100} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        )
+      })}
+      {rows.length === 0 && (
+        <div className="text-sm text-muted-foreground">No balances found.</div>
+      )}
     </div>
   )
 }

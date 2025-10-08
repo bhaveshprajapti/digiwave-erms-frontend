@@ -25,9 +25,11 @@ interface ProfileUpdateRequest {
   id: number
   user_name: string
   user_email: string
-  field_name: string
-  old_value: string
-  new_value: string
+  field_name?: string // For backward compatibility with old requests
+  old_value?: string
+  new_value?: string
+  changes?: Array<{ field: string; old_value: string; new_value: string }> // For new consolidated requests
+  details?: string // Human-readable summary of changes
   status: 'pending' | 'approved' | 'rejected'
   reason: string
   admin_comment: string
@@ -123,7 +125,8 @@ export function ProfileRequestsManagement() {
     const matchesSearch = 
       request.user_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       request.user_email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      request.field_name.toLowerCase().includes(searchQuery.toLowerCase())
+      (request.field_name && request.field_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (request.details && request.details.toLowerCase().includes(searchQuery.toLowerCase()))
     
     const matchesStatus = statusFilter === "all" || request.status === statusFilter
     
@@ -366,24 +369,78 @@ export function ProfileRequestsManagement() {
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                            {formatFieldName(request.field_name)}
+                            {request.field_name === 'multiple_fields' ? 
+                              'Multiple Fields' : 
+                              request.changes ? 
+                                `${request.changes.length} field(s)` : 
+                                formatFieldName(request.field_name || 'Unknown')}
                           </Badge>
                           {getStatusBadge(request.status)}
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-red-600">Current Value</Label>
-                            <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
-                              {request.old_value || 'Empty'}
+                        
+                        {/* Handle consolidated requests */}
+                        {request.field_name === 'multiple_fields' ? (
+                          <div className="space-y-3">
+                            <div>
+                              <Label>Summary</Label>
+                              <div className="p-2 bg-gray-50 border rounded text-sm">
+                                {request.old_value || 'Multiple field changes'}
+                              </div>
+                            </div>
+                            <div>
+                              <Label>Changes Details</Label>
+                              <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+                                {request.new_value || request.reason || 'Multiple field changes'}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <Label className="text-green-600">New Value</Label>
-                            <div className="p-2 bg-green-50 border border-green-200 rounded text-sm">
-                              {request.new_value}
+                        ) : request.changes ? (
+                          <div className="space-y-3">
+                            <div>
+                              <Label>Changes Summary</Label>
+                              <div className="p-3 bg-gray-50 border rounded text-sm whitespace-pre-line">
+                                {request.details || 'Multiple field changes'}
+                              </div>
+                            </div>
+                            
+                            {/* Individual changes breakdown */}
+                            <div className="space-y-2">
+                              <Label>Individual Changes</Label>
+                              {request.changes.map((change, idx) => (
+                                <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2 bg-white border rounded">
+                                  <div>
+                                    <Label className="text-red-600 text-xs">{formatFieldName(change.field)} - Current</Label>
+                                    <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
+                                      {change.old_value || 'Empty'}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <Label className="text-green-600 text-xs">{formatFieldName(change.field)} - New</Label>
+                                    <div className="p-2 bg-green-50 border border-green-200 rounded text-sm">
+                                      {change.new_value}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
-                        </div>
+                        ) : (
+                          /* Handle legacy single field requests */
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-red-600">Current Value</Label>
+                              <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
+                                {request.old_value || 'Empty'}
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-green-600">New Value</Label>
+                              <div className="p-2 bg-green-50 border border-green-200 rounded text-sm">
+                                {request.new_value}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         {request.reason && (
                           <div>
                             <Label>Reason</Label>

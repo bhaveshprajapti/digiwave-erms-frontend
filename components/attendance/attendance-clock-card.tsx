@@ -4,93 +4,418 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Clock, MapPin, LogIn, LogOut } from "lucide-react"
+import { useToast } from "@/components/ui/use-toast"
+import { Clock, MapPin, LogIn, LogOut, Users, Timer, Coffee } from "lucide-react"
+import { checkIn, checkOut, getAttendanceStatus, AttendanceStatus } from "@/lib/api/attendances"
 
 export function AttendanceClockCard() {
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [isClockedIn, setIsClockedIn] = useState(false)
-  const [clockInTime, setClockInTime] = useState<Date | null>(null)
-  const [workHours, setWorkHours] = useState("00:00:00")
+  const { toast } = useToast()
+  const [currentTime, setCurrentTime] = useState<Date | null>(null)
+  const [isClient, setIsClient] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [attendanceStatus, setAttendanceStatus] = useState<AttendanceStatus | null>(null)
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [liveWorkingTime, setLiveWorkingTime] = useState<string>("0:00:00")
+  const [currentSessionStart, setCurrentSessionStart] = useState<Date | null>(null)
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-      if (clockInTime) {
-        const diff = new Date().getTime() - clockInTime.getTime()
-        const hours = Math.floor(diff / (1000 * 60 * 60))
-        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-        const seconds = Math.floor((diff % (1000 * 60)) / 1000)
-        setWorkHours(
-          `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
-        )
+  // Get user's location
+  const getUserLocation = (): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported'))
+        return
       }
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [clockInTime])
-
-  const handleClockIn = () => {
-    setIsClockedIn(true)
-    setClockInTime(new Date())
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          })
+        },
+        (error) => {
+          console.warn('Could not get location:', error.message)
+          // Use a default location if geolocation fails
+          resolve({ lat: 0, lng: 0 })
+        },
+        { timeout: 5000, enableHighAccuracy: true }
+      )
+    })
   }
 
-  const handleClockOut = () => {
-    setIsClockedIn(false)
-    setClockInTime(null)
-    setWorkHours("00:00:00")
+  // Load attendance status
+  const loadAttendanceStatus = async () => {
+    try {
+      const status = await getAttendanceStatus()
+      setAttendanceStatus(status)
+      
+      // Set current session start time if checked in
+      if (status.is_checked_in && status.last_check_in) {
+        setCurrentSessionStart(new Date(status.last_check_in))
+      } else {
+        setCurrentSessionStart(null)
+        // Set static working hours when not checked in
+        const totalHours = status.total_hours || "0:00:00"
+        const cleanTime = totalHours.split('.')[0]
+        setLiveWorkingTime(cleanTime)
+      }
+    } catch (error: any) {
+      console.error('Error loading attendance status:', error)
+      // Don't show error toast for status loading failures
+    }
+  }
+
+  // Initial setup effect
+  useEffect(() => {
+    setIsClient(true)
+    setCurrentTime(new Date())
+    
+    // Load initial attendance status
+    loadAttendanceStatus()
+    
+    // Get user location
+    getUserLocation().then(setLocation).catch(() => {
+      console.warn('Using default location')
+      setLocation({ lat: 0, lng: 0 })
+    })
+  }, [])
+
+  // Timer effect for live updates
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = new Date()
+      setCurrentTime(now)
+      
+      // Calculate live working time if checked in
+      if (currentSessionStart && attendanceStatus?.is_checked_in) {
+        const currentSessionDuration = now.getTime() - currentSessionStart.getTime()
+        
+        // Parse total hours more safely
+        const totalHoursStr = attendanceStatus.total_hours || "0:00:00"
+        const timeParts = totalHoursStr.split(":")
+        const prevHours = parseInt(timeParts[0]) || 0
+        const prevMinutes = parseInt(timeParts[1]) || 0
+        const prevSeconds = parseFloat(timeParts[2]) || 0
+        const prevTotalMs = (prevHours * 3600 + prevMinutes * 60 + prevSeconds) * 1000
+        
+        const totalMs = prevTotalMs + currentSessionDuration
+        const hours = Math.floor(totalMs / (1000 * 60 * 60))
+        const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60))
+        const seconds = Math.floor((totalMs % (1000 * 60)) / 1000)
+        
+        setLiveWorkingTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
+      } else {
+        // Use static total hours when not checked in
+        const totalHours = attendanceStatus?.total_hours || "0:00:00"
+        // Remove microseconds if present
+        const cleanTime = totalHours.split('.')[0]
+        setLiveWorkingTime(cleanTime)
+      }
+    }, 1000)
+    
+    return () => clearInterval(timer)
+  }, [currentSessionStart, attendanceStatus?.is_checked_in, attendanceStatus?.total_hours])
+
+  // Status refresh effect
+  useEffect(() => {
+    const statusTimer = setInterval(() => {
+      loadAttendanceStatus()
+    }, 30000) // Refresh every 30 seconds
+    
+    return () => clearInterval(statusTimer)
+  }, [])
+
+  // Initialize working time when attendance status changes
+  useEffect(() => {
+    if (attendanceStatus) {
+      if (!attendanceStatus.is_checked_in) {
+        const totalHours = attendanceStatus.total_hours || "0:00:00"
+        const cleanTime = totalHours.split('.')[0]
+        setLiveWorkingTime(cleanTime)
+      }
+    }
+  }, [attendanceStatus])
+
+  const handleClockIn = async () => {
+    if (isLoading) return
+    setIsLoading(true)
+    
+    try {
+      const locationData = location || { lat: 0, lng: 0 }
+      const response = await checkIn({ location: locationData })
+      
+      // Set current session start time immediately
+      setCurrentSessionStart(new Date(response.check_in_time))
+      
+      toast({
+        title: "Success", 
+        description: `Checked in successfully! Session ${response.session_count}`,
+      })
+      
+      // Refresh status after successful check-in
+      await loadAttendanceStatus()
+      
+    } catch (error: any) {
+      console.error('Check-in error:', error)
+      toast({
+        title: "Error",
+        description: error?.response?.data?.detail || "Failed to check in",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleClockOut = async () => {
+    if (isLoading) return
+    setIsLoading(true)
+    
+    try {
+      const locationData = location || { lat: 0, lng: 0 }
+      const response = await checkOut({ location: locationData })
+      
+      // Clear current session start time
+      setCurrentSessionStart(null)
+      
+      toast({
+        title: "Success",
+        description: `Checked out successfully! Total time: ${response.total_hours}`,
+      })
+      
+      // Refresh status after successful check-out
+      await loadAttendanceStatus()
+      
+    } catch (error: any) {
+      console.error('Check-out error:', error)
+      toast({
+        title: "Error",
+        description: error?.response?.data?.detail || "Failed to check out",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Helper function to format time
+  const formatTime = (timeString?: string) => {
+    if (!timeString) return "--:--:--"
+    return new Date(timeString).toLocaleTimeString()
+  }
+
+  // Get dynamic border color based on status with animation
+  const getBorderColor = () => {
+    if (attendanceStatus?.is_on_leave) {
+      return "border-l-orange-500"
+    }
+    return attendanceStatus?.is_checked_in 
+      ? "border-l-green-500" 
+      : "border-l-blue-500"
+  }
+
+  // Get text color for working hours
+  const getTextColor = () => {
+    if (attendanceStatus?.is_on_leave) {
+      return "text-orange-600"
+    }
+    return attendanceStatus?.is_checked_in ? "text-green-600" : "text-blue-600"
+  }
+
+  // Get background color for icon
+  const getIconBgColor = () => {
+    if (attendanceStatus?.is_on_leave) {
+      return "bg-orange-100"
+    }
+    return attendanceStatus?.is_checked_in ? "bg-green-100" : "bg-blue-100"
+  }
+
+  // Get icon color
+  const getIconColor = () => {
+    if (attendanceStatus?.is_on_leave) {
+      return "text-orange-600"
+    }
+    return attendanceStatus?.is_checked_in ? "text-green-600" : "text-blue-600"
   }
 
   return (
-    <Card className="border-l-4 border-l-primary bg-gradient-to-br from-card to-muted/20">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle>Today's Attendance</CardTitle>
-          <Badge variant={isClockedIn ? "default" : "secondary"} className="gap-1">
-            <Clock className="h-3 w-3" />
-            {isClockedIn ? "Clocked In" : "Not Clocked In"}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Current Time</p>
-            <p className="text-2xl font-bold">{currentTime.toLocaleTimeString()}</p>
-            <p className="text-sm text-muted-foreground">{currentTime.toLocaleDateString()}</p>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Work Hours Today</p>
-            <p className="text-2xl font-bold">{workHours}</p>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin className="h-3 w-3" />
-              <span>Office - Main Building</span>
+    <div className="space-y-6">
+      {/* Main Stats Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Working Hours Card - Dynamic Colors */}
+        <Card className={`border-l-4 ${getBorderColor()} relative overflow-hidden transition-all duration-500 ${
+          attendanceStatus?.is_checked_in 
+            ? 'ring-1 ring-green-500/10 shadow-md hover:shadow-lg' 
+            : 'hover:shadow-md'
+        }`}>
+          {/* Subtle progressive fill animation when checked in */}
+          {attendanceStatus?.is_checked_in && (
+            <div className="absolute inset-0 bg-gradient-to-r from-green-50/20 via-transparent to-transparent animate-progressive-fill" />
+          )}
+          <CardContent className="p-4 relative z-10">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground">Today's Hours</p>
+                <p className={`text-3xl font-bold ${getTextColor()} font-mono tracking-wide transition-colors duration-300`}>
+                  {isClient ? liveWorkingTime : "00:00:00"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {attendanceStatus?.is_checked_in ? "Live working time" : "Today's total working time"}
+                </p>
+              </div>
+              <div className={`h-14 w-14 ${getIconBgColor()} rounded-xl flex items-center justify-center transition-all duration-300 ${
+                attendanceStatus?.is_checked_in 
+                  ? 'shadow-md shadow-green-500/10' 
+                  : 'shadow-sm'
+              }`}>
+                <Timer className={`h-7 w-7 ${getIconColor()} transition-colors duration-300`} />
+              </div>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="flex items-center justify-center">
-            {!isClockedIn ? (
-              <Button onClick={handleClockIn} size="lg" className="w-full">
-                <LogIn className="mr-2 h-4 w-4" />
-                Clock In
-              </Button>
-            ) : (
-              <Button onClick={handleClockOut} size="lg" variant="outline" className="w-full bg-transparent">
-                <LogOut className="mr-2 h-4 w-4" />
-                Clock Out
-              </Button>
+        {/* Sessions Card */}
+        <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-card to-muted/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Sessions Today</p>
+                <p className="text-2xl font-bold text-purple-600">
+                  {attendanceStatus?.total_sessions || 0}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {attendanceStatus?.completed_sessions || 0} completed
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Users className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Break Time Card */}
+        <Card className="border-l-4 border-l-yellow-500 bg-gradient-to-br from-card to-muted/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Break Time</p>
+                <p className="text-2xl font-bold text-yellow-600 font-mono">
+                  {attendanceStatus?.break_time?.split('.')[0] || "0:00:00"}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <Coffee className="h-6 w-6 text-yellow-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Status Card */}
+        <Card className="border-l-4 border-l-slate-500 bg-gradient-to-br from-card to-muted/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Status</p>
+                <p className="text-lg font-bold text-slate-600">
+                  {attendanceStatus?.is_on_leave ? "On Leave" :
+                   attendanceStatus?.is_checked_in ? "Checked In" : "Not Checked In"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isClient && currentTime ? currentTime.toLocaleTimeString() : "--:--:--"}
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                <Clock className="h-6 w-6 text-slate-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Action Card */}
+      <Card className={`border-l-4 bg-gradient-to-br from-card to-muted/20 transition-all duration-500 ${
+        attendanceStatus?.is_checked_in 
+          ? 'border-l-green-500 ring-1 ring-green-500/20 shadow-md'
+          : 'border-l-primary'
+      }`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Quick Actions
+            {attendanceStatus?.is_checked_in && (
+              <div className="ml-auto flex items-center gap-2 text-sm text-green-600">
+                <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+                Active Session
+              </div>
             )}
-          </div>
-        </div>
-
-        {isClockedIn && clockInTime && (
-          <div className="mt-4 rounded-lg bg-muted p-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Clocked in at:</span>
-              <span className="font-medium">{clockInTime.toLocaleTimeString()}</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            {/* Clock/Date Info - Left Side */}
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                <Clock className="h-5 w-5 text-slate-600" />
+              </div>
+              <div className="text-sm">
+                <p className="font-medium text-foreground">
+                  {isClient && currentTime ? currentTime.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric'
+                  }) : "Loading..."}
+                </p>
+                <p className="text-muted-foreground">
+                  {isClient && currentTime ? currentTime.toLocaleTimeString() : "--:--:--"}
+                </p>
+                {attendanceStatus?.last_check_in && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Last check-in: {formatTime(attendanceStatus.last_check_in)}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {/* Check-in/out Button - Right Side */}
+            <div className="flex-shrink-0">
+              {!attendanceStatus?.is_checked_in ? (
+                <Button 
+                  onClick={handleClockIn} 
+                  size="sm" 
+                  className="bg-green-600 hover:bg-green-700 text-white border-0 px-6"
+                  disabled={isLoading || attendanceStatus?.is_on_leave}
+                >
+                  <LogIn className="mr-2 h-4 w-4" />
+                  {isLoading ? "Checking In..." : "Check In"}
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleClockOut} 
+                  size="sm" 
+                  className="bg-red-600 hover:bg-red-700 text-white border-0 px-6"
+                  disabled={isLoading}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  {isLoading ? "Checking Out..." : "Check Out"}
+                </Button>
+              )}
             </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          
+          {attendanceStatus?.is_on_leave && (
+            <div className="mt-4 bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-orange-800">
+                <Coffee className="h-5 w-5" />
+                <div>
+                  <p className="font-medium">You are currently on approved leave</p>
+                  <p className="text-sm">Check-in is disabled during your leave period.</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

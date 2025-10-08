@@ -7,7 +7,7 @@ import useShifts from "@/hooks/use-shifts"
 
 export default function ShiftsPage() {
   const { shifts, isLoading, createShift, updateShift, deleteShift } = useShifts()
-  
+
   const handleAdd = async (data: Partial<Shift>) => {
     const start = data.start_time?.toString().trim() || ''
     const end = data.end_time?.toString().trim() || ''
@@ -18,6 +18,14 @@ export default function ShiftsPage() {
       is_active: Boolean(data.is_active ?? true),
     }
     await createShift(newShift as Omit<Shift, 'id'>)
+  }
+
+  const formatTime12 = (timeStr?: string) => {
+    if (!timeStr) return ''
+    // Ensure we have HH:mm or HH:mm:ss
+    const t = timeStr.length === 5 ? `${timeStr}:00` : timeStr
+    const d = new Date(`1970-01-01T${t}`)
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
   }
 
   return (
@@ -33,6 +41,18 @@ export default function ShiftsPage() {
             { key: "start_time" as keyof Shift, label: "Start Time", type: "time" as const },
             { key: "end_time" as keyof Shift, label: "End Time", type: "time" as const },
             { key: "is_active" as keyof Shift, label: "Status", type: "switch" as const },
+          ]}
+          tableColumns={[
+            { key: 'sr', header: 'Sr No.', cell: (_item, i) => <span className="font-medium">{i + 1}</span>, className: 'w-16' },
+            { key: 'name', header: 'Name', cell: (s) => <span className="font-medium">{s.name}</span> },
+{ key: 'time_range', header: 'Time', cell: (s) => (
+              <span className="text-sm">{formatTime12(s.start_time)} {formatTime12(s.end_time)}</span>
+            ) },
+            { key: 'is_active', header: 'Status', cell: (s) => (
+              <span className={`px-2 py-0.5 rounded text-xs ${s.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {s.is_active ? 'Active' : 'Inactive'}
+              </span>
+            ) },
           ]}
           onAdd={handleAdd}
           onEdit={async (id, data) => {

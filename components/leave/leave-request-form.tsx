@@ -1,140 +1,100 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Info } from "lucide-react"
-import { DatePicker } from "@/components/ui/date-picker"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { useToast } from "@/components/ui/use-toast"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { getLeaveTypes } from "@/lib/api/leave-types"
+import { createLeaveRequest } from "@/lib/api/leave-requests"
+import { authService } from "@/lib/auth"
+
+function daysBetweenInclusive(a?: Date, b?: Date): number {
+  if (!a || !b) return 0
+  const start = new Date(a.getFullYear(), a.getMonth(), a.getDate())
+  const end = new Date(b.getFullYear(), b.getMonth(), b.getDate())
+  const ms = end.getTime() - start.getTime()
+  return Math.floor(ms / (24*3600*1000)) + 1
+}
 
 export function LeaveRequestForm() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
+  const [types, setTypes] = useState<{ value: number; label: string }[]>([])
   const [leaveType, setLeaveType] = useState("")
-  const [startDate, setStartDate] = useState<Date>()
-  const [endDate, setEndDate] = useState<Date>()
-  const [duration, setDuration] = useState(0)
+  const [start, setStart] = useState<Date | undefined>()
+  const [end, setEnd] = useState<Date | undefined>()
+  const [reason, setReason] = useState("")
+  const [saving, setSaving] = useState(false)
 
-  const leaveBalances: Record<string, { remaining: number; total: number }> = {
-    casual: { remaining: 13, total: 18 },
-    sick: { remaining: 10, total: 12 },
-    annual: { remaining: 7, total: 15 },
+  const user = authService.getUserData()
+  const orgId = user?.organization?.id
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const data = await getLeaveTypes()
+        setTypes(data.map(d => ({ value: d.id, label: `${d.name} (${d.code})` })))
+      } catch {}
+    })()
+  }, [])
+
+  const submit = async () => {
+    if (!user?.id || !orgId) { toast({ title: 'Not logged in', variant: 'destructive' }); return }
+    if (!leaveType) { toast({ title: 'Select leave type', variant: 'destructive' }); return }
+    if (!start || !end) { toast({ title: 'Select date range', variant: 'destructive' }); return }
+    const diff = daysBetweenInclusive(start, end)
+    if (diff <= 0) { toast({ title: 'Invalid range', variant: 'destructive' }); return }
+    setSaving(true)
+    try {
+      await createLeaveRequest({
+        user: user.id,
+        leave_type: Number(leaveType),
+        start_date: start.toISOString().slice(0,10),
+        end_date: end.toISOString().slice(0,10),
+        duration_days: String(diff),
+        reason: reason || 'N/A',
+        organization: orgId,
+      } as any)
+      toast({ title: 'Submitted', description: 'Your leave request has been submitted.' })
+      setLeaveType("")
+      setStart(undefined)
+      setEnd(undefined)
+      setReason("")
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message ?? 'Failed to submit', variant: 'destructive' })
+    } finally { setSaving(false) }
   }
-
-  const calculateDuration = (start?: Date, end?: Date) => {
-    if (start && end) {
-      const diff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-      setDuration(diff > 0 ? diff : 0)
-    } else {
-      setDuration(0)
-    }
-  }
-
-  const handleStartDateChange = (date: Date | undefined) => {
-    setStartDate(date)
-    calculateDuration(date, endDate)
-  }
-
-  const handleEndDateChange = (date: Date | undefined) => {
-    setEndDate(date)
-    calculateDuration(startDate, date)
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-
-    // Mock submission
-    setTimeout(() => {
-      router.push("/dashboard/leave")
-    }, 1000)
-  }
-
-  const selectedBalance = leaveType ? leaveBalances[leaveType] : null
 
   return (
-    <form onSubmit={handleSubmit}>
-      <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Leave Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="leaveType">Leave Type</Label>
-              <Select value={leaveType} onValueChange={setLeaveType} required>
-                <SelectTrigger id="leaveType">
-                  <SelectValue placeholder="Select leave type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="casual">Casual Leave (13 of 18 remaining)</SelectItem>
-                  <SelectItem value="sick">Sick Leave (10 of 12 remaining)</SelectItem>
-                  <SelectItem value="annual">Annual Leave (7 of 15 remaining)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedBalance && (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>
-                  You have {selectedBalance.remaining} of {selectedBalance.total} days remaining for this leave type.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date</Label>
-                <DatePicker value={startDate} onChange={handleStartDateChange} placeholder="Select start date" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="endDate">End Date</Label>
-                <DatePicker
-                  value={endDate}
-                  onChange={handleEndDateChange}
-                  placeholder="Select end date"
-                  disabled={!startDate}
-                />
-              </div>
-            </div>
-
-            {duration > 0 && (
-              <Alert>
-                <Info className="h-4 w-4" />
-                <AlertDescription>Duration: {duration} day(s)</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="reason">Reason</Label>
-              <Textarea id="reason" placeholder="Please provide a reason for your leave request" required rows={4} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="document">Supporting Document (Optional)</Label>
-              <Input id="document" type="file" accept=".pdf,.jpg,.jpeg,.png" />
-              <p className="text-xs text-muted-foreground">Upload medical certificate or other supporting documents</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex justify-end gap-4">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={loading || duration === 0}>
-            {loading ? "Submitting..." : "Submit Request"}
-          </Button>
+    <Card>
+      <CardHeader>
+        <CardTitle>Leave Request</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label>Leave Type</Label>
+            <select className="h-9 w-full rounded-md border px-2" value={leaveType} onChange={(e)=>setLeaveType(e.target.value)}>
+              <option value="">Select type</option>
+              {types.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <Label>Date Range</Label>
+            <DateRangePicker start={start} end={end} onChangeStart={setStart} onChangeEnd={setEnd} />
+            <p className="text-xs text-muted-foreground">Total days: {daysBetweenInclusive(start, end)}</p>
+          </div>
+          <div className="sm:col-span-2 space-y-1">
+            <Label>Reason</Label>
+            <Input value={reason} onChange={(e)=>setReason(e.target.value)} placeholder="Enter a reason" />
+          </div>
+          <div className="sm:col-span-2">
+            <Button onClick={submit} disabled={saving}>{saving ? 'Submitting...' : 'Submit Request'}</Button>
+          </div>
         </div>
-      </div>
-    </form>
+      </CardContent>
+    </Card>
   )
 }

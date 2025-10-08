@@ -161,22 +161,25 @@ export function EmployeeProfile() {
         return
       }
 
-      // Submit profile update requests to API
-      const submitPromises = changes.map(change => 
-        api.post('/accounts/profile-update-requests/', {
-          field_name: change.field,
-          old_value: change.old_value,
-          new_value: change.new_value,
-          reason: `Update ${change.field.replace('_', ' ')}`,
-          document_link: requestDocumentLink || undefined
-        })
-      )
+      // Create one consolidated profile update request
+      const changesDetails = changes.map(change => 
+        `${change.field.replace('_', ' ')}: "${change.old_value}" → "${change.new_value}"`
+      ).join(', ')
       
-      await Promise.all(submitPromises)
+      // Since bulk endpoint doesn't exist, create a single request with consolidated info
+      const requestData = {
+        field_name: 'multiple_fields',
+        old_value: `Multiple fields (${changes.length} changes)`,
+        new_value: changesDetails,
+        reason: `Profile update request with ${changes.length} field(s): ${changesDetails}`,
+        document_link: requestDocumentLink || undefined
+      }
+      
+      await api.post('/accounts/profile-update-requests/', requestData)
       
       toast({
         title: "Update Requested",
-        description: `${changes.length} profile update(s) submitted for admin approval`,
+        description: `Profile update request with ${changes.length} field changes submitted for admin approval`,
       })
       
       setEditMode(false)
@@ -225,64 +228,39 @@ export function EmployeeProfile() {
           <p className="text-gray-600">Manage your personal information and settings</p>
         </div>
         <div className="flex items-center space-x-2">
-          {!editMode ? (
-            <Button onClick={() => setEditMode(true)} className="flex items-center space-x-2">
+          {!editMode && (
+            <Button 
+              onClick={() => setEditMode(true)} 
+              disabled={pendingRequests.some(r => r.status === 'pending')}
+              className="flex items-center space-x-2"
+            >
               <Edit className="h-4 w-4" />
               <span>Edit Profile</span>
             </Button>
-          ) : (
-            <div className="flex items-center space-x-2">
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setEditMode(false)
-                  setRequestDocumentLink("")
-                  loadUserProfile() // Reset form data
-                }}
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleSaveProfile}
-                disabled={saving}
-                className="flex items-center space-x-2"
-              >
-                {saving ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                <span>{saving ? "Submitting..." : "Submit for Approval"}</span>
-              </Button>
+          )}
+          {!editMode && pendingRequests.some(r => r.status === 'pending') && (
+            <div className="text-sm text-orange-600">
+              Profile editing disabled - pending approval
             </div>
           )}
         </div>
       </div>
 
-      {/* Pending Requests Alert */}
-      {pendingRequests.length > 0 && (
-        <Card className="border-orange-200 bg-orange-50">
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
-              <div>
-                <p className="font-medium text-orange-800">
-                  You have {pendingRequests.length} pending profile update request(s)
-                </p>
-                <p className="text-sm text-orange-700">
-                  Your changes are waiting for admin approval
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="profile">Profile Information</TabsTrigger>
-          <TabsTrigger value="requests">Update Requests</TabsTrigger>
-        </TabsList>
+        <div className="flex justify-start">
+          <TabsList className="w-auto">
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="requests" className="flex items-center gap-2">
+              Requests
+              {pendingRequests.filter(r => r.status === 'pending').length > 0 && (
+                <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 text-xs px-1.5 py-0.5">
+                  {pendingRequests.filter(r => r.status === 'pending').length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="profile" className="space-y-6">
           {editMode && (
@@ -535,6 +513,45 @@ export function EmployeeProfile() {
               </div>
             </CardContent>
           </Card>
+          
+          {/* Action Buttons at Bottom Right */}
+          {editMode && (
+            <div className="flex justify-end gap-3 pt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setEditMode(false)
+                  setRequestDocumentLink("")
+                  loadUserProfile() // Reset form data
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSaveProfile}
+                disabled={saving || pendingRequests.some(r => r.status === 'pending')}
+                className="flex items-center space-x-2"
+              >
+                {saving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                <span>{saving ? "Submitting..." : "Submit for Approval"}</span>
+              </Button>
+            </div>
+          )}
+          
+          {/* Pending Request Warning */}
+          {editMode && pendingRequests.some(r => r.status === 'pending') && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mt-4">
+              <div className="flex items-center gap-2 text-orange-800 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                <span>You have a pending profile update request. Please wait for approval before submitting new changes.</span>
+              </div>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="requests" className="space-y-6">
@@ -581,7 +598,13 @@ export function EmployeeProfile() {
                         <div className="text-right">
                           <Badge 
                             variant="secondary"
-                            className="bg-orange-100 text-orange-800 border-orange-200"
+                            className={`capitalize ${
+                              request.status === 'approved' 
+                                ? 'bg-green-100 text-green-800 border-green-200'
+                                : request.status === 'rejected'
+                                ? 'bg-red-100 text-red-800 border-red-200'
+                                : 'bg-orange-100 text-orange-800 border-orange-200'
+                            }`}
                           >
                             {request.status}
                           </Badge>
