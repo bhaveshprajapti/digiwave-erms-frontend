@@ -6,12 +6,14 @@ import { LeaveTypesManager } from "@/components/leave/admin/leave-types-manager"
 import { LeaveTypePoliciesManager } from "@/components/leave/admin/leave-type-policies-manager"
 import { LeaveApplicationsManager } from "@/components/leave/admin/leave-applications-manager"
 import { LeaveBalanceManager } from "@/components/leave/admin/leave-balance-manager"
+import { FlexibleTimingTypesManager } from "@/components/leave/admin/flexible-timing-types-manager"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   Calendar, 
   Settings, 
   Users, 
-  FileText 
+  FileText,
+  Clock
 } from "lucide-react"
 
 export function PolicyManagement() {
@@ -20,7 +22,7 @@ export function PolicyManagement() {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="applications" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Applications
@@ -32,6 +34,10 @@ export function PolicyManagement() {
           <TabsTrigger value="leave-types" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
             Leave Types
+          </TabsTrigger>
+          <TabsTrigger value="flexible-timing" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Flexible Timing
           </TabsTrigger>
           <TabsTrigger value="policies" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
@@ -49,6 +55,10 @@ export function PolicyManagement() {
         
         <TabsContent value="leave-types" className="space-y-6">
           <LeaveTypesManager />
+        </TabsContent>
+        
+        <TabsContent value="flexible-timing" className="space-y-6">
+          <FlexibleTimingTypesManager />
         </TabsContent>
         
         <TabsContent value="policies" className="space-y-6">

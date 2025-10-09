@@ -20,6 +20,12 @@ import {
   addLeaveApplicationComment,
   deleteLeaveRequest
 } from "@/lib/api/leave-requests"
+import { 
+  getFlexibleTimingRequests,
+  approveFlexibleTimingRequest,
+  rejectFlexibleTimingRequest,
+  deleteFlexibleTimingRequest
+} from "@/lib/api/flexible-timing"
 import { getLeaveTypes } from "@/lib/api/leave-types"
 import { getUsers } from "@/lib/api/users"
 import { LeaveRequest } from "@/lib/schemas"
@@ -35,13 +41,17 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [leaveTypeFilter, setLeaveTypeFilter] = useState<string>("all")
-  const [selectedApplication, setSelectedApplication] = useState<LeaveRequest | null>(null)
+  const [requestTypeFilter, setRequestTypeFilter] = useState<string>("all") // New filter for request type
+  const [selectedApplication, setSelectedApplication] = useState<any>(null) // Changed to any to handle both types
   const [viewMode, setViewMode] = useState<'view' | 'approve' | 'reject' | null>(null)
   const [actionComment, setActionComment] = useState("")
   const [rejectionReason, setRejectionReason] = useState("")
   const [processing, setProcessing] = useState(false)
   const [comments, setComments] = useState<any[]>([])
   const [newComment, setNewComment] = useState("")
+  
+  // Data
+  const [flexibleTimingRequests, setFlexibleTimingRequests] = useState<any[]>([])
   
   // Reference data
   const [leaveTypes, setLeaveTypes] = useState<any[]>([])
@@ -56,7 +66,51 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
   const { toast } = useToast()
   
   // Use centralized state management
-  const { requests: applications, loading, refreshAll, removeRequest, updateRequest } = useAdminLeaveRequests()
+  const { requests: leaveApplications, loading, refreshAll, removeRequest, updateRequest } = useAdminLeaveRequests()
+
+  // Fetch flexible timing requests
+  useEffect(() => {
+    const fetchFlexibleTimingRequests = async () => {
+      try {
+        const flexibleRequests = await getFlexibleTimingRequests()
+        // Add type identifier to distinguish from leave requests
+        const typedRequests = flexibleRequests.map((req: any) => ({
+          ...req,
+          request_type: 'flexible-timing',
+          leave_type_name: req.flexible_timing_type?.name || 'Flexible Timing',
+          employee_name: req.employee ? `${req.employee.first_name} ${req.employee.last_name}` : 
+                        req.user_name || req.employee_name || 'Unknown',
+          duration_display: `${req.duration_minutes} minutes`,
+          // Map flexible timing fields to match leave request structure
+          start_date: req.requested_date,
+          end_date: req.requested_date,
+          total_days: 0 // Flexible timing doesn't use leave days
+        }))
+        setFlexibleTimingRequests(typedRequests)
+      } catch (error) {
+        console.error('Failed to fetch flexible timing requests:', error)
+      }
+    }
+
+    fetchFlexibleTimingRequests()
+  }, [])
+
+  // Combine all applications
+  const allApplications = useMemo(() => {
+    const typedLeaveApps = leaveApplications.map((app: any) => ({
+      ...app,
+      unique_key: `leave-${app.id}`, // Add unique key for React
+      request_type: app.is_half_day ? 'half-day' : 'full-day',
+      duration_display: app.is_half_day ? '0.5 days' : `${app.total_days} days`
+    }))
+    
+    const typedFlexibleApps = flexibleTimingRequests.map((req: any) => ({
+      ...req,
+      unique_key: `flexible-${req.id}`, // Add unique key for React
+    }))
+    
+    return [...typedLeaveApps, ...typedFlexibleApps]
+  }, [leaveApplications, flexibleTimingRequests])
 
   // Create lookup maps
   const leaveTypeMap = useMemo(() => {
@@ -79,17 +133,26 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
 
   // Filter applications
   const filteredApplications = useMemo(() => {
-    return applications.filter(app => {
-      const user = userMap[app.user]
+    return allApplications.filter((app: any) => {
+      // Handle both leave requests and flexible timing requests
+      const user = app.request_type === 'flexible-timing' ? 
+        { first_name: app.employee_name?.split(' ')[0] || '', last_name: app.employee_name?.split(' ')[1] || '' } :
+        userMap[app.user]
+      
       const userName = user ? `${user.first_name} ${user.last_name}`.toLowerCase() : ""
-      const leaveTypeName = leaveTypeMap[app.leave_type]?.toLowerCase() || ""
+      const leaveTypeName = app.request_type === 'flexible-timing' ? 
+        app.leave_type_name?.toLowerCase() || '' :
+        leaveTypeMap[app.leave_type]?.toLowerCase() || ""
       
       const matchesSearch = searchTerm === "" || 
         userName.includes(searchTerm.toLowerCase()) ||
         leaveTypeName.includes(searchTerm.toLowerCase()) ||
-        app.reason.toLowerCase().includes(searchTerm.toLowerCase())
+        (app.reason || '').toLowerCase().includes(searchTerm.toLowerCase())
       
-      const status = app.status as any
+      // Filter by request type
+      const matchesRequestType = requestTypeFilter === "all" || app.request_type === requestTypeFilter
+      
+      const status = app.status
       const matchesStatus = statusFilter === "all" || 
         (statusFilter === "pending" && (!status || status === 1 || status === 'pending')) ||
         (statusFilter === "approved" && (status === 2 || status === 'approved')) ||
@@ -99,9 +162,9 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
       const matchesLeaveType = leaveTypeFilter === "all" || 
         app.leave_type.toString() === leaveTypeFilter
       
-      return matchesSearch && matchesStatus && matchesLeaveType
+      return matchesSearch && matchesStatus && matchesLeaveType && matchesRequestType
     })
-  }, [applications, searchTerm, statusFilter, leaveTypeFilter, userMap, leaveTypeMap])
+  }, [allApplications, searchTerm, statusFilter, leaveTypeFilter, requestTypeFilter, userMap, leaveTypeMap])
 
   const loadData = async () => {
     try {
@@ -145,10 +208,11 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     return endDate >= startOfToday
   }
 
-  const handleAdminDelete = async (app: LeaveRequest) => {
+  const handleAdminDelete = async (app: any) => {
+    const isFlexibleTiming = app.request_type === 'flexible-timing'
     const result = await Swal.fire({
-      title: 'Delete Leave Request?',
-      text: 'This will permanently delete the leave request. This action cannot be undone.',
+      title: `Delete ${isFlexibleTiming ? 'Flexible Timing' : 'Leave'} Request?`,
+      text: 'This will permanently delete the request. This action cannot be undone.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Yes, delete it',
@@ -159,13 +223,32 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     if (!result.isConfirmed) return
 
     try {
-      await deleteLeaveRequest(app.id)
-      toast({ title: 'Deleted', description: 'Leave request deleted successfully.' })
-      // Remove from context and refresh
-      removeRequest(app.id)
-      await refreshAll()
+      if (isFlexibleTiming) {
+        await deleteFlexibleTimingRequest(app.id)
+        toast({ title: 'Deleted', description: 'Flexible timing request deleted successfully.' })
+        // Refresh flexible timing requests
+        const flexibleRequests = await getFlexibleTimingRequests()
+        const typedRequests = flexibleRequests.map((req: any) => ({
+          ...req,
+          request_type: 'flexible-timing',
+          leave_type_name: req.flexible_timing_type?.name || 'Flexible Timing',
+          employee_name: req.employee ? `${req.employee.first_name} ${req.employee.last_name}` : 
+                        req.user_name || req.employee_name || 'Unknown',
+          duration_display: `${req.duration_minutes} minutes`,
+          start_date: req.requested_date,
+          end_date: req.requested_date,
+          total_days: 0
+        }))
+        setFlexibleTimingRequests(typedRequests)
+      } else {
+        await deleteLeaveRequest(app.id)
+        toast({ title: 'Deleted', description: 'Leave request deleted successfully.' })
+        // Remove from context and refresh
+        removeRequest(app.id)
+        await refreshAll()
+      }
     } catch (error: any) {
-      toast({ title: 'Error', description: error?.response?.data?.detail || 'Failed to delete leave request', variant: 'destructive' })
+      toast({ title: 'Error', description: error?.response?.data?.detail || 'Failed to delete request', variant: 'destructive' })
     }
   }
 
@@ -185,18 +268,41 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     await loadComments(application.id)
   }
 
-  const handleApproveApplication = async (application: LeaveRequest) => {
+  const handleApproveApplication = async (application: any) => {
     setProcessing(true)
     try {
       console.log('Approving application:', application.id)
-      await approveLeaveRequest(application.id, "")
-      toast({
-        title: "Success",
-        description: "Leave application approved successfully"
-      })
-      // Update the request status in context and refresh
-      updateRequest(application.id, { status: 2 as any })
-      await refreshAll()
+      
+      if (application.request_type === 'flexible-timing') {
+        await approveFlexibleTimingRequest(application.id)
+        toast({
+          title: "Success",
+          description: "Flexible timing request approved successfully"
+        })
+        // Refresh flexible timing requests
+        const flexibleRequests = await getFlexibleTimingRequests()
+        const typedRequests = flexibleRequests.map((req: any) => ({
+          ...req,
+          request_type: 'flexible-timing',
+          leave_type_name: req.flexible_timing_type?.name || 'Flexible Timing',
+          employee_name: req.employee ? `${req.employee.first_name} ${req.employee.last_name}` : 
+                        req.user_name || req.employee_name || 'Unknown',
+          duration_display: `${req.duration_minutes} minutes`,
+          start_date: req.requested_date,
+          end_date: req.requested_date,
+          total_days: 0
+        }))
+        setFlexibleTimingRequests(typedRequests)
+      } else {
+        await approveLeaveRequest(application.id, "")
+        toast({
+          title: "Success",
+          description: "Leave application approved successfully"
+        })
+        // Update the request status in context and refresh
+        updateRequest(application.id, { status: 2 as any })
+        await refreshAll()
+      }
     } catch (error: any) {
       console.error('Approval error:', error)
       toast({
@@ -209,7 +315,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     }
   }
 
-  const handleRejectApplication = (application: LeaveRequest) => {
+  const handleRejectApplication = (application: any) => {
     setSelectedApplication(application)
     setViewMode('reject')
     setActionComment("")
@@ -258,18 +364,42 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     setProcessing(true)
     try {
       console.log('Rejecting application:', selectedApplication.id, 'Reason:', rejectionReason)
-      await rejectLeaveRequest(selectedApplication.id, rejectionReason, actionComment)
-      toast({
-        title: "Success",
-        description: "Leave application rejected successfully"
-      })
+      
+      if (selectedApplication.request_type === 'flexible-timing') {
+        await rejectFlexibleTimingRequest(selectedApplication.id, rejectionReason, actionComment)
+        toast({
+          title: "Success",
+          description: "Flexible timing request rejected successfully"
+        })
+        // Refresh flexible timing requests
+        const flexibleRequests = await getFlexibleTimingRequests()
+        const typedRequests = flexibleRequests.map((req: any) => ({
+          ...req,
+          request_type: 'flexible-timing',
+          leave_type_name: req.flexible_timing_type?.name || 'Flexible Timing',
+          employee_name: req.employee ? `${req.employee.first_name} ${req.employee.last_name}` : 
+                        req.user_name || req.employee_name || 'Unknown',
+          duration_display: `${req.duration_minutes} minutes`,
+          start_date: req.requested_date,
+          end_date: req.requested_date,
+          total_days: 0
+        }))
+        setFlexibleTimingRequests(typedRequests)
+      } else {
+        await rejectLeaveRequest(selectedApplication.id, rejectionReason, actionComment)
+        toast({
+          title: "Success",
+          description: "Leave application rejected successfully"
+        })
+        // Update the request status in context and refresh
+        updateRequest(selectedApplication.id, { status: 3 as any, rejection_reason: rejectionReason })
+        await refreshAll()
+      }
+      
       setViewMode(null)
       setSelectedApplication(null)
       setActionComment("")
       setRejectionReason("")
-      // Update the request status in context and refresh
-      updateRequest(selectedApplication.id, { status: 3 as any, rejection_reason: rejectionReason })
-      await refreshAll()
     } catch (error: any) {
       console.error('Rejection error:', error)
       toast({
@@ -393,14 +523,19 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     {
       key: 'sr_no',
       header: 'Sr No',
-      cell: (app: LeaveRequest, index: number) => index + 1
+      cell: (app: any, index: number) => index + 1
     },
     {
       key: 'user',
       header: 'Employee',
-      cell: (app: LeaveRequest) => {
-        const user = userMap[app.user]
-        const userName = user ? `${user.first_name} ${user.last_name}` : 'Unknown'
+      cell: (app: any) => {
+        const userName = app.request_type === 'flexible-timing' ? 
+          app.employee_name || 'Unknown' :
+          (() => {
+            const user = userMap[app.user]
+            return user ? `${user.first_name} ${user.last_name}` : 'Unknown'
+          })()
+        
         return (
           <button 
             className="text-primary hover:underline font-medium text-left"
@@ -412,22 +547,43 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
       }
     },
     {
+      key: 'request_type',
+      header: 'Request Type',
+      cell: (app: any) => {
+        const typeMap = {
+          'full-day': 'Full Day Leave',
+          'half-day': 'Half Day Leave', 
+          'flexible-timing': 'Flexible Timing'
+        }
+        return (
+          <Badge variant="outline" className="capitalize">
+            {typeMap[app.request_type as keyof typeof typeMap] || app.request_type}
+          </Badge>
+        )
+      }
+    },
+    {
       key: 'leave_type',
-      header: 'Leave Type',
-      cell: (app: LeaveRequest) => leaveTypeMap[app.leave_type] || 'Unknown'
+      header: 'Leave/Timing Type',
+      cell: (app: any) => app.request_type === 'flexible-timing' ? 
+        app.leave_type_name || 'Flexible Timing' :
+        leaveTypeMap[app.leave_type] || 'Unknown'
     },
     {
       key: 'dates',
       header: 'Dates',
-      cell: (app: LeaveRequest) => `${formatDate(app.start_date)} - ${formatDate(app.end_date)}`
+      cell: (app: any) => {
+        if (app.request_type === 'flexible-timing') {
+          return formatDate(app.requested_date)
+        }
+        return `${formatDate(app.start_date)} - ${formatDate(app.end_date)}`
+      }
     },
     {
       key: 'duration',
       header: 'Duration',
-      cell: (app: LeaveRequest) => {
-        // Use total_days from backend if available, otherwise calculate
-        const duration = app.total_days || calculateDuration(app.start_date, app.end_date)
-        return `${duration} day(s)`
+      cell: (app: any) => {
+        return app.duration_display || `${app.total_days || 0} day(s)`
       }
     },
     {
@@ -438,9 +594,24 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     {
       key: 'actions',
       header: <span className="block text-center">Actions</span>,
-      cell: (app: LeaveRequest) => {
-        const isPending = isPendingApplication(app)
-        const canDelete = canAdminDelete(app)
+      cell: (app: any) => {
+        const isPending = app.request_type === 'flexible-timing' ? 
+          (!app.status || app.status === 'pending' || app.status === 1) :
+          isPendingApplication(app)
+        
+        const canDelete = app.request_type === 'flexible-timing' ? 
+          (() => {
+            // For flexible timing, allow delete until the requested time ends
+            const requestedDate = new Date(app.requested_date || app.start_date)
+            const now = new Date()
+            const requestedDateTime = new Date(requestedDate)
+            
+            // Add duration to get end time (assuming flexible timing is within the same day)
+            requestedDateTime.setMinutes(requestedDateTime.getMinutes() + (app.duration_minutes || 60))
+            
+            return requestedDateTime > now && (!app.status || app.status === 'pending' || app.status === 1)
+          })() :
+          canAdminDelete(app)
         
         return (
           <div className="flex items-center justify-center gap-2">
@@ -513,6 +684,17 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={requestTypeFilter} onValueChange={setRequestTypeFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Request Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="full-day">Full Day Leave</SelectItem>
+                <SelectItem value="half-day">Half Day Leave</SelectItem>
+                <SelectItem value="flexible-timing">Flexible Timing</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={leaveTypeFilter} onValueChange={setLeaveTypeFilter}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Leave Type" />
@@ -532,7 +714,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
           <DataTable
             columns={columns}
             data={filteredApplications}
-            getRowKey={(app) => app.id}
+            getRowKey={(app) => app.unique_key || `${app.request_type}-${app.id}`}
             striped
             pageSize={10}
           />
@@ -565,24 +747,40 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
               {/* Application Details */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium">Leave Type</Label>
-                  <p className="text-sm">{leaveTypeMap[selectedApplication.leave_type] || 'Unknown'}</p>
+                  <Label className="text-sm font-medium">
+                    {selectedApplication.request_type === 'flexible-timing' ? 'Timing Type' : 'Leave Type'}
+                  </Label>
+                  <p className="text-sm">
+                    {selectedApplication.request_type === 'flexible-timing' 
+                      ? selectedApplication.leave_type_name || 'Flexible Timing'
+                      : leaveTypeMap[selectedApplication.leave_type] || 'Unknown'
+                    }
+                  </p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Status</Label>
                   <div className="mt-1">{getStatusBadge(selectedApplication.status)}</div>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Start Date</Label>
+                  <Label className="text-sm font-medium">
+                    {selectedApplication.request_type === 'flexible-timing' ? 'Requested Date' : 'Start Date'}
+                  </Label>
                   <p className="text-sm">{formatDate(selectedApplication.start_date)}</p>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium">End Date</Label>
-                  <p className="text-sm">{formatDate(selectedApplication.end_date)}</p>
-                </div>
+                {selectedApplication.request_type !== 'flexible-timing' && (
+                  <div>
+                    <Label className="text-sm font-medium">End Date</Label>
+                    <p className="text-sm">{formatDate(selectedApplication.end_date)}</p>
+                  </div>
+                )}
                 <div>
                   <Label className="text-sm font-medium">Duration</Label>
-                  <p className="text-sm">{selectedApplication && calculateDuration(selectedApplication.start_date, selectedApplication.end_date)} day(s)</p>
+                  <p className="text-sm">
+                    {selectedApplication.request_type === 'flexible-timing' 
+                      ? selectedApplication.duration_display || `${selectedApplication.duration_minutes} minutes`
+                      : selectedApplication.duration_display || `${calculateDuration(selectedApplication.start_date, selectedApplication.end_date)} day(s)`
+                    }
+                  </p>
                 </div>
                 {selectedApplication.half_day_type && (
                   <div>

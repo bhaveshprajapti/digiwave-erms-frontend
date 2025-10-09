@@ -95,9 +95,59 @@ export const getLeaveApplicationComments = async (id: number): Promise<any[]> =>
 }
 
 export const addLeaveApplicationComment = async (id: number, comment: string, is_internal?: boolean): Promise<any> => {
-  const res: AxiosResponse<any> = await api.post(`${base}${id}/add_comment/`, {
+  // Import authService dynamically to avoid circular imports
+  const { authService } = await import('@/lib/auth')
+  
+  // Try to get user ID from authService
+  let userId = null
+  
+  try {
+    const userData = authService.getUserData()
+    userId = userData?.id
+  } catch (e) {
+    console.warn('Could not get user from authService:', e)
+  }
+  
+  // If no user ID from authService, try localStorage as fallback
+  if (!userId) {
+    try {
+      const userData = localStorage.getItem('user')
+      if (userData) {
+        const user = JSON.parse(userData)
+        userId = user.id || user.user_id
+      }
+    } catch (e) {
+      console.warn('Could not parse user from localStorage:', e)
+    }
+  }
+  
+  // If still no user ID, let the backend handle it (it might get it from the session/token)
+  const payload: any = {
     comment,
     is_internal: is_internal || false
-  })
-  return res.data
+  }
+  
+  // Only add user ID if we have it
+  if (userId) {
+    payload.user = userId
+  }
+  
+  console.log('Adding comment with payload:', payload)
+  
+  try {
+    const res: AxiosResponse<any> = await api.post(`${base}${id}/add_comment/`, payload)
+    return res.data
+  } catch (error: any) {
+    console.error('Comment API error:', error.response?.data)
+    
+    // If user field is required but not provided, try without it (let backend handle from token)
+    if (error.response?.status === 400 && error.response?.data?.user) {
+      console.log('Retrying without user field...')
+      const { user, ...payloadWithoutUser } = payload
+      const retryRes: AxiosResponse<any> = await api.post(`${base}${id}/add_comment/`, payloadWithoutUser)
+      return retryRes.data
+    }
+    
+    throw error
+  }
 }

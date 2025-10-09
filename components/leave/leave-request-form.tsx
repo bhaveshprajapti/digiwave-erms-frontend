@@ -12,8 +12,12 @@ import { createLeaveRequest } from "@/lib/api/leave-requests"
 import { authService } from "@/lib/auth"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Calendar, Clock } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AlertTriangle, Calendar, Clock, Timer } from "lucide-react"
 import { useLeaveRequestsContext } from "@/contexts/leave-requests-context"
+import { FlexibleTimingForm } from "./flexible-timing-form"
 
 // Helper function to calculate duration (EXACTLY like backend Django model)
 function calculateDuration(startDate: string, endDate: string): number {
@@ -46,8 +50,28 @@ export function LeaveRequestForm() {
   const [start, setStart] = useState<Date | undefined>()
   const [end, setEnd] = useState<Date | undefined>()
   const [reason, setReason] = useState("")
+  
+  // Half-day leave options
   const [isHalfDay, setIsHalfDay] = useState(false)
   const [halfDayPeriod, setHalfDayPeriod] = useState<'morning' | 'afternoon'>('morning')
+  
+  // Hourly leave options
+  const [isHourlyLeave, setIsHourlyLeave] = useState(false)
+  const [startTime, setStartTime] = useState("")
+  const [endTime, setEndTime] = useState("")
+  const [totalHours, setTotalHours] = useState(0)
+  
+  // Request type selection
+  const [requestType, setRequestType] = useState<'full-day' | 'half-day' | 'hourly' | 'flexible-timing'>('full-day')
+
+  // Sync isHalfDay state with requestType
+  useEffect(() => {
+    if (requestType === 'half-day') {
+      setIsHalfDay(true)
+    } else {
+      setIsHalfDay(false)
+    }
+  }, [requestType])
   const [emergencyContact, setEmergencyContact] = useState("")
   const [emergencyPhone, setEmergencyPhone] = useState("")
   const [workHandover, setWorkHandover] = useState("")
@@ -86,6 +110,38 @@ export function LeaveRequestForm() {
     const balance = balances.find(b => b.leave_type === Number(leaveType))
     return balance ? Number(balance.remaining_balance) || 0 : 0
   }
+
+  // Calculate hours between start and end time
+  const calculateHours = (startTime: string, endTime: string): number => {
+    if (!startTime || !endTime) return 0
+    
+    const start = new Date(`2000-01-01T${startTime}:00`)
+    const end = new Date(`2000-01-01T${endTime}:00`)
+    
+    if (end <= start) return 0
+    
+    const diffMs = end.getTime() - start.getTime()
+    return diffMs / (1000 * 60 * 60) // Convert to hours
+  }
+
+  // Calculate total days based on request type
+  const calculateTotalDays = (): number => {
+    if (requestType === 'half-day') return 0.5
+    if (requestType === 'hourly') return totalHours / 8 // Assuming 8-hour work day
+    if (requestType === 'flexible-timing') return 0 // Flexible timing doesn't use leave days
+    
+    // Full day calculation
+    if (!start || !end) return 0
+    return daysBetweenInclusive(start, end) + 1
+  }
+
+  // Update total hours when time changes
+  useEffect(() => {
+    if (requestType === 'hourly' && startTime && endTime) {
+      const hours = calculateHours(startTime, endTime)
+      setTotalHours(hours)
+    }
+  }, [startTime, endTime, requestType])
 
   // Check for date conflicts with existing requests (any overlapping dates regardless of leave type)
   const hasDateConflict = () => {
@@ -147,9 +203,24 @@ export function LeaveRequestForm() {
       const conflictingRequest = getConflictingRequest()
       const conflictStart = conflictingRequest ? new Date(conflictingRequest.start_date).toLocaleDateString() : ''
       const conflictEnd = conflictingRequest ? new Date(conflictingRequest.end_date).toLocaleDateString() : ''
+      
+      // Get status name
+      const getStatusName = (status: any) => {
+        if (typeof status === 'string') {
+          return status.toLowerCase() === 'pending' ? 'pending' : 
+                 status.toLowerCase() === 'approved' ? 'approved' : 
+                 status.toLowerCase() === 'rejected' ? 'rejected' : 'pending'
+        }
+        return status === 1 ? 'pending' : 
+               status === 2 ? 'approved' : 
+               status === 3 ? 'rejected' : 'pending'
+      }
+      
+      const statusName = getStatusName(conflictingRequest?.status)
+      
       return {
         type: 'error',
-        message: `You already have a leave request from ${conflictStart} to ${conflictEnd} that overlaps with the selected dates. Please choose different dates.`
+        message: `You already have a ${statusName} leave request from ${conflictStart} to ${conflictEnd} that overlaps with the selected dates. Please choose different dates.`
       }
     }
     
@@ -170,28 +241,43 @@ export function LeaveRequestForm() {
       return 
     }
     
+    // For half-day, ensure we have a leave type
+    if (requestType === 'half-day' && !leaveType) {
+      toast({ title: 'Leave type is required for half-day requests', variant: 'destructive' })
+      return 
+    }
+    
     if (!start || !end) { 
       toast({ title: 'Please select date range', variant: 'destructive' })
       return 
     }
     
-    if (isHalfDay && (start.getFullYear() !== end.getFullYear() || start.getMonth() !== end.getMonth() || start.getDate() !== end.getDate())) {
+    if ((requestType === 'half-day' || isHalfDay) && start && end && (start.getFullYear() !== end.getFullYear() || start.getMonth() !== end.getMonth() || start.getDate() !== end.getDate())) {
       toast({ title: 'Half day leave must have same start and end date', variant: 'destructive' })
       return
     }
     
     const diff = daysBetweenInclusive(start, end)
-    if (diff <= 0) { 
-      toast({ title: 'Invalid date range', variant: 'destructive' })
-      return 
+    // For half-day, allow same date (diff could be 0)
+    if (requestType === 'half-day') {
+      if (diff < 0) {
+        toast({ title: 'Invalid date range', variant: 'destructive' })
+        return 
+      }
+    } else {
+      if (diff <= 0) { 
+        toast({ title: 'Invalid date range', variant: 'destructive' })
+        return 
+      }
     }
     
     // Check balance
     const availableBalance = getAvailableBalance()
-    if (availableBalance !== null && diff > availableBalance) {
+    const requestedDays = requestType === 'half-day' ? 0.5 : diff
+    if (availableBalance !== null && requestedDays > availableBalance) {
       toast({ 
         title: 'Insufficient Balance', 
-        description: `You have ${availableBalance} days available but requesting ${diff} days.`,
+        description: `You have ${availableBalance} days available but requesting ${requestedDays} days.`,
         variant: 'destructive' 
       })
       return
@@ -214,18 +300,29 @@ export function LeaveRequestForm() {
     
     setSaving(true)
     try {
-      await createLeaveRequest({
+      const requestData: any = {
         leave_type: Number(leaveType),
         start_date: start ? `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}` : '',
         end_date: end ? `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}` : '',
-        is_half_day: isHalfDay,
-        half_day_period: isHalfDay ? halfDayPeriod : undefined,
         reason: reason.trim(),
         emergency_contact: emergencyContact.trim() || undefined,
         emergency_phone: emergencyPhone.trim() || undefined,
         work_handover: workHandover.trim() || undefined,
         attachment: attachment || undefined,
-      })
+      }
+
+      // Add fields based on request type
+      if (requestType === 'half-day') {
+        requestData.is_half_day = true
+        requestData.half_day_period = halfDayPeriod
+        requestData.total_days = 0.5
+      } else {
+        // Full day leave
+        requestData.is_half_day = false
+        requestData.total_days = calculateTotalDays()
+      }
+
+      await createLeaveRequest(requestData)
       
       toast({ 
         title: 'Success', 
@@ -237,6 +334,7 @@ export function LeaveRequestForm() {
       setStart(undefined)
       setEnd(undefined)
       setReason("")
+      setRequestType('full-day')
       setIsHalfDay(false)
       setHalfDayPeriod('morning')
       setEmergencyContact("")
@@ -265,9 +363,52 @@ export function LeaveRequestForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Apply for Leave</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Request Leave or Flexible Timing
+        </CardTitle>
       </CardHeader>
       <CardContent>
+        <Tabs value={requestType} onValueChange={(value: any) => setRequestType(value)} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="full-day" className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Full Day Leave
+            </TabsTrigger>
+            <TabsTrigger value="half-day" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Half Day Leave
+            </TabsTrigger>
+            <TabsTrigger value="flexible-timing" className="flex items-center gap-2">
+              <Timer className="h-4 w-4" />
+              Flexible Timing
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Full Day Leave Tab */}
+          <TabsContent value="full-day" className="space-y-4">
+            {renderLeaveForm()}
+          </TabsContent>
+
+          {/* Half Day Leave Tab */}
+          <TabsContent value="half-day" className="space-y-4">
+            {renderHalfDayForm()}
+          </TabsContent>
+
+
+          {/* Flexible Timing Tab */}
+          <TabsContent value="flexible-timing" className="space-y-4">
+            <FlexibleTimingForm onSuccess={() => refreshAll()} />
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  )
+
+  // Render full day leave form
+  function renderLeaveForm() {
+    return (
+      <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1">
             <Label>Leave Type</Label>
@@ -332,10 +473,11 @@ export function LeaveRequestForm() {
           
           <div className="sm:col-span-2 space-y-1">
             <Label>Reason</Label>
-            <Input 
+            <Textarea 
               value={reason} 
               onChange={(e) => setReason(e.target.value)} 
               placeholder="Enter a reason for your leave request" 
+              rows={3}
             />
           </div>
           
@@ -343,12 +485,203 @@ export function LeaveRequestForm() {
             <Button 
               onClick={submit} 
               disabled={saving || (validationMessage?.type === 'error')}
+              className="w-full"
             >
-              {saving ? 'Submitting...' : 'Submit Request'}
+              {saving ? 'Submitting...' : 'Submit Full Day Leave Request'}
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
-  )
+      </div>
+    )
+  }
+
+  // Render half day leave form
+  function renderHalfDayForm() {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label>Leave Type *</Label>
+            <Select value={leaveType} onValueChange={setLeaveType}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Select leave type to deduct from" />
+              </SelectTrigger>
+              <SelectContent>
+                {types.map(t => (
+                  <SelectItem key={t.value} value={t.value.toString()}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {leaveType && (
+              <div className="flex items-center gap-2 mt-1">
+                <Calendar className="h-3 w-3 text-blue-500" />
+                <span className="text-xs text-blue-600">
+                  Available: {getAvailableBalance()} days
+                </span>
+              </div>
+            )}
+            <div className="p-2 bg-blue-50 rounded border border-blue-200">
+              <p className="text-xs text-blue-700">
+                <Clock className="h-3 w-3 inline mr-1" />
+                Half-day leave will deduct 0.5 days from the selected leave type
+              </p>
+            </div>
+          </div>
+          
+          <div className="space-y-1">
+            <Label>Date</Label>
+            <DateRangePicker 
+              start={start} 
+              end={start} // Same date for half day
+              onChangeStart={(date) => {
+                setStart(date)
+                setEnd(date) // Set same date for half day
+              }} 
+              onChangeEnd={(date) => {
+                setStart(date)
+                setEnd(date)
+              }} 
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label>Half Day Period</Label>
+            <Select value={halfDayPeriod} onValueChange={(value: 'morning' | 'afternoon') => setHalfDayPeriod(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="morning">Morning (First Half)</SelectItem>
+                <SelectItem value="afternoon">Afternoon (Second Half)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {halfDayPeriod === 'morning' 
+                ? 'You will be absent in the morning and work in the afternoon'
+                : 'You will work in the morning and be absent in the afternoon'
+              }
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Duration</Label>
+            <Badge variant="secondary" className="w-full justify-center p-2">
+              <Clock className="h-3 w-3 mr-2" />
+              0.5 days (Half Day)
+            </Badge>
+          </div>
+          
+          <div className="sm:col-span-2 space-y-1">
+            <Label>Reason</Label>
+            <Textarea 
+              value={reason} 
+              onChange={(e) => setReason(e.target.value)} 
+              placeholder="Enter a reason for your half-day leave request" 
+              rows={3}
+            />
+          </div>
+          
+          <div className="sm:col-span-2">
+            <Button 
+              onClick={submit} 
+              disabled={saving || !start || !leaveType}
+              className="w-full"
+            >
+              {saving ? 'Submitting...' : 'Submit Half Day Leave Request'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Render hourly leave form
+  function renderHourlyForm() {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label>Leave Type</Label>
+            <Select value={leaveType} onValueChange={setLeaveType}>
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder="Select leave type" />
+              </SelectTrigger>
+              <SelectContent>
+                {types.map(t => (
+                  <SelectItem key={t.value} value={t.value.toString()}>
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-1">
+            <Label>Date</Label>
+            <DateRangePicker 
+              start={start} 
+              end={start} // Same date for hourly
+              onChangeStart={(date) => {
+                setStart(date)
+                setEnd(date)
+              }} 
+              onChangeEnd={(date) => {
+                setStart(date)
+                setEnd(date)
+              }} 
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label>Start Time</Label>
+            <Input
+              type="time"
+              value={startTime}
+              onChange={(e) => setStartTime(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label>End Time</Label>
+            <Input
+              type="time"
+              value={endTime}
+              onChange={(e) => setEndTime(e.target.value)}
+            />
+          </div>
+
+          {totalHours > 0 && (
+            <div className="sm:col-span-2">
+              <Badge variant="secondary" className="w-full justify-center p-2">
+                <Timer className="h-3 w-3 mr-2" />
+                {totalHours.toFixed(1)} hours ({(totalHours / 8).toFixed(2)} days)
+              </Badge>
+            </div>
+          )}
+          
+          <div className="sm:col-span-2 space-y-1">
+            <Label>Reason</Label>
+            <Textarea 
+              value={reason} 
+              onChange={(e) => setReason(e.target.value)} 
+              placeholder="Enter a reason for your hourly leave request" 
+              rows={3}
+            />
+          </div>
+          
+          <div className="sm:col-span-2">
+            <Button 
+              onClick={submit} 
+              disabled={saving || !start || !leaveType || !startTime || !endTime || totalHours <= 0}
+              className="w-full"
+            >
+              {saving ? 'Submitting...' : 'Submit Hourly Leave Request'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 }

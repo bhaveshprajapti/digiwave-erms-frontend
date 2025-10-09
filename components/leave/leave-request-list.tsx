@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable } from "@/components/common/data-table"
 import { getLeaveRequests, deleteLeaveRequest } from "@/lib/api/leave-requests"
 import { getLeaveTypes } from "@/lib/api/leave-types"
+import { getMyFlexibleTimingRequests, deleteFlexibleTimingRequest } from "@/lib/api/flexible-timing"
 import { authService } from "@/lib/auth"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { ActionButtons } from "@/components/common/action-buttons"
@@ -106,16 +107,42 @@ export function LeaveRequestList() {
   const [typesMap, setTypesMap] = useState<Record<number, string>>({})
   const [selected, setSelected] = useState<any | null>(null)
   const [open, setOpen] = useState(false)
+  const [flexibleTimingRequests, setFlexibleTimingRequests] = useState<any[]>([])
   const { toast } = useToast()
 
   // Use centralized state management
   const { requests, loading, refreshAll, removeRequest, setFilters } = useLeaveRequestsContext()
 
+  // Combine all requests (leave + flexible timing)
+  const allRequests = useMemo(() => {
+    const typedLeaveRequests = requests.map((req: any) => ({
+      ...req,
+      unique_key: `leave-${req.id}`, // Add unique key for React
+      request_type: req.is_half_day ? 'half-day' : 'full-day',
+      duration_display: req.is_half_day ? '0.5 days' : `${req.total_days} days`,
+      leave_type_name: typesMap[req.leave_type] || 'Unknown'
+    }))
+
+    const typedFlexibleRequests = flexibleTimingRequests.map((req: any) => ({
+      ...req,
+      unique_key: `flexible-${req.id}`, // Add unique key for React
+      request_type: 'flexible-timing',
+      duration_display: `${req.duration_minutes} minutes`,
+      leave_type_name: req.flexible_timing_type?.name || 'Flexible Timing',
+      // Map flexible timing fields to match leave request structure for display
+      start_date: req.requested_date,
+      end_date: req.requested_date,
+      user: userId // Since these are user's own requests
+    }))
+
+    return [...typedLeaveRequests, ...typedFlexibleRequests]
+  }, [requests, flexibleTimingRequests, typesMap, userId])
+
   // Filter requests for current user and date range
   const filteredRows = useMemo(() => {
-    return requests.filter(r => {
-      // Filter by user
-      if (r.user !== userId) return false
+    return allRequests.filter(r => {
+      // Filter by user (leave requests) or current user (flexible timing)
+      if (r.request_type !== 'flexible-timing' && r.user !== userId) return false
       
       // Filter by date range
       const d = new Date(r.start_date)
@@ -123,7 +150,17 @@ export function LeaveRequestList() {
       if (end && d > new Date(end.getFullYear(), end.getMonth(), end.getDate())) return false
       return true
     })
-  }, [requests, userId, start, end])
+  }, [allRequests, userId, start, end])
+
+  // Fetch flexible timing requests
+  const fetchFlexibleTimingRequests = async () => {
+    try {
+      const flexibleRequests = await getMyFlexibleTimingRequests()
+      setFlexibleTimingRequests(flexibleRequests)
+    } catch (error) {
+      console.error('Failed to fetch flexible timing requests:', error)
+    }
+  }
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -135,6 +172,9 @@ export function LeaveRequestList() {
         
         // Load requests into context
         await refreshAll()
+        
+        // Load flexible timing requests
+        await fetchFlexibleTimingRequests()
       } catch (e: any) {
         console.error('Failed to load leave requests', e)
         toast({ title: 'Unable to load leave requests', description: e?.response?.data?.detail || e?.message || 'Please try again.', variant: 'destructive' })
@@ -157,7 +197,7 @@ export function LeaveRequestList() {
     <>
       <Card>
         <CardHeader className="flex items-start justify-between gap-3">
-          <CardTitle>My Leave Requests</CardTitle>
+          <CardTitle>My Leave Requests & Flexible Timing</CardTitle>
           <div className="flex items-center gap-2">
             <DateRangePicker start={start} end={end} onChangeStart={setStart} onChangeEnd={setEnd} />
           </div>
@@ -166,9 +206,25 @@ export function LeaveRequestList() {
           <DataTable<any>
             columns={[
               { key: 'sr', header: 'Sr No.', cell: (_r, i) => <span className="font-medium">{i + 1}</span>, className: 'w-16' },
-              { key: 'leave', header: 'Leave Type', cell: (r) => (
+              { 
+                key: 'request_type', 
+                header: 'Request Type', 
+                cell: (r) => {
+                  const typeMap = {
+                    'full-day': 'Full Day Leave',
+                    'half-day': 'Half Day Leave', 
+                    'flexible-timing': 'Flexible Timing'
+                  }
+                  return (
+                    <Badge variant="outline" className="capitalize">
+                      {typeMap[(r as any).request_type as keyof typeof typeMap] || (r as any).request_type}
+                    </Badge>
+                  )
+                }
+              },
+              { key: 'leave', header: 'Type/Category', cell: (r) => (
                 <button className="text-primary hover:underline font-medium" onClick={() => { setSelected(r); setOpen(true) }}>
-                  {typesMap[(r as any).leave_type] || `#${(r as any).leave_type}`}
+                  {(r as any).leave_type_name || 'Unknown'}
                 </button>
               )},
               { 
@@ -186,10 +242,7 @@ export function LeaveRequestList() {
                 key: 'duration', 
                 header: 'Duration', 
                 cell: (r) => {
-                  // Always use our calculation to ensure consistency
-                  const duration = calculateDuration((r as any).start_date, (r as any).end_date)
-                  console.log(`Duration calculation for ${(r as any).start_date} to ${(r as any).end_date}: ${duration} days`)
-                  return `${duration} day${duration !== 1 ? 's' : ''}`
+                  return (r as any).duration_display || `${(r as any).total_days || 0} days`
                 },
                 className: 'w-24' 
               },
@@ -212,11 +265,18 @@ export function LeaveRequestList() {
                       extras={[{ title: 'View', onClick: () => { setSelected(r); setOpen(true) } }]}
                       onDelete={canUserDelete ? async () => {
                         try {
-                          await deleteLeaveRequest(request.id)
-                          toast({ title: 'Deleted', description: 'Leave request deleted successfully.' })
-                          // Remove from context and refresh
-                          removeRequest(request.id)
-                          await refreshAll()
+                          if (request.request_type === 'flexible-timing') {
+                            await deleteFlexibleTimingRequest(request.id)
+                            toast({ title: 'Deleted', description: 'Flexible timing request deleted successfully.' })
+                            // Refresh flexible timing requests
+                            await fetchFlexibleTimingRequests()
+                          } else {
+                            await deleteLeaveRequest(request.id)
+                            toast({ title: 'Deleted', description: 'Leave request deleted successfully.' })
+                            // Remove from context and refresh
+                            removeRequest(request.id)
+                            await refreshAll()
+                          }
                         } catch (e: any) {
                           toast({ title: 'Error', description: e?.response?.data?.detail || e?.message || 'Failed to delete', variant: 'destructive' })
                         }
@@ -227,7 +287,7 @@ export function LeaveRequestList() {
               }},
             ]}
             data={filteredRows}
-            getRowKey={(r)=> (r as any).id}
+            getRowKey={(r)=> (r as any).unique_key || `${(r as any).request_type}-${(r as any).id}`}
             striped
           />
         </CardContent>
