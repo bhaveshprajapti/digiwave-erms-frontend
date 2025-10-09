@@ -12,7 +12,7 @@ export const employeeNavigationSections = [
     items: [
       { href: "/employee-dashboard/attendance", label: "Attendance", icon: Clock },
       { href: "/employee-dashboard/leave", label: "Leave Requests", icon: Calendar },
-      { href: "/employee-dashboard/requests", label: "Profile Requests", icon: FileText },
+      // { href: "/employee-dashboard/requests", label: "Profile Requests", icon: FileText },
     ]
   },
   {

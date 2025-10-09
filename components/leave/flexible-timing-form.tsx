@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { Calendar, Clock, AlertTriangle, CheckCircle } from "lucide-react"
 import { 
   getFlexibleTimingTypes, 
@@ -29,7 +30,7 @@ export function FlexibleTimingForm({ onSuccess }: FlexibleTimingFormProps) {
   
   // Form state
   const [timingType, setTimingType] = useState("")
-  const [requestedDate, setRequestedDate] = useState("")
+  const [requestedDate, setRequestedDate] = useState<Date | undefined>()
   const [durationMinutes, setDurationMinutes] = useState("")
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
@@ -148,9 +149,14 @@ export function FlexibleTimingForm({ onSuccess }: FlexibleTimingFormProps) {
 
     setSaving(true)
     try {
+      // Format date as YYYY-MM-DD for API
+      const formattedDate = requestedDate ? 
+        `${requestedDate.getFullYear()}-${String(requestedDate.getMonth() + 1).padStart(2, '0')}-${String(requestedDate.getDate()).padStart(2, '0')}` : 
+        ''
+      
       const requestData: CreateFlexibleTimingRequest = {
         timing_type: parseInt(timingType),
-        requested_date: requestedDate,
+        requested_date: formattedDate,
         duration_minutes: parseInt(durationMinutes),
         reason: reason.trim(),
         is_emergency: isEmergency
@@ -165,7 +171,7 @@ export function FlexibleTimingForm({ onSuccess }: FlexibleTimingFormProps) {
 
       // Reset form
       setTimingType("")
-      setRequestedDate("")
+      setRequestedDate(undefined)
       setDurationMinutes("")
       setStartTime("")
       setEndTime("")
@@ -263,12 +269,11 @@ export function FlexibleTimingForm({ onSuccess }: FlexibleTimingFormProps) {
           {/* Date */}
           <div className="space-y-2">
             <Label htmlFor="requested-date">Requested Date *</Label>
-            <Input
-              id="requested-date"
-              type="date"
-              value={requestedDate}
-              onChange={(e) => setRequestedDate(e.target.value)}
-              min={new Date().toISOString().split('T')[0]}
+            <DateRangePicker 
+              start={requestedDate} 
+              end={requestedDate} // Same date for flexible timing
+              onChangeStart={(date) => setRequestedDate(date)} 
+              onChangeEnd={(date) => setRequestedDate(date)} 
             />
           </div>
 
