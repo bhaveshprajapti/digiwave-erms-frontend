@@ -30,8 +30,47 @@ export interface Employee {
   is_staff: boolean
 }
 
-export interface CreateEmployeeData extends Omit<Employee, 'id'> {
-  password: string
+export interface User {
+  id: number
+  username: string
+  first_name: string
+  last_name: string
+  email: string
+  phone?: string | null
+  is_active: boolean
+  is_staff: boolean
+}
+
+export interface LeaveBalanceSummary {
+  year: number
+  user: string
+  user_id?: number // Added dynamically for lookup purposes
+  total_allocated: number
+  total_used: number
+  total_pending: number
+  total_remaining: number
+  balances: Array<{
+    leave_type: string
+    leave_type_code: string
+    allocated: number
+    used: number
+    pending: number
+    remaining: number
+    policy_name?: string
+  }>
+  applications: Array<{
+    leave_type: string
+    start_date: string
+    end_date: string
+    days: number
+    status: string
+    policy_name?: string
+  }>
+  overall_compliance: {
+    compliant: boolean
+    violations: string[]
+    warnings: string[]
+  }
 }
 
 export interface Role {
@@ -80,7 +119,7 @@ export interface LeaveType {
 export interface LeavePolicy {
   id: number
   name: string
-  leave_types: number[]
+  leave_type: number
   applicable_roles?: number[]
   annual_quota: number
   monthly_accrual: string
@@ -95,11 +134,19 @@ export interface LeaveBalance {
   id: number
   user: number
   leave_type: number
+  leave_type_name?: string
   year: number
-  opening_balance: string
-  used: string
-  carried_forward: string
-  policy?: number | null
+  opening_balance: number
+  accrued_balance: number
+  used_balance: number
+  carried_forward: number
+  adjustment: number
+  total_available: number
+  remaining_balance: number
+  pending_balance: number
+  policy_name?: string
+  last_accrual_date?: string
+  last_reset_date?: string
   updated_at?: string
 }
 
@@ -110,6 +157,7 @@ export interface LeaveRequest {
   start_date: string // YYYY-MM-DD
   end_date: string // YYYY-MM-DD
   duration_days: string
+  total_days?: number // Added for backend compatibility
   half_day_type?: string | null
   reason: string
   document?: string | null
