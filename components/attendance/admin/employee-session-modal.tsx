@@ -11,7 +11,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Clock, Coffee, Play, Pause, User, Calendar } from "lucide-react"
+import api from "@/lib/api"
 
 interface Session {
   id: string
@@ -26,7 +29,8 @@ interface EmployeeSessionModalProps {
   onClose: () => void
   employeeName: string
   employeeId: number
-  date: string
+  selectedDate: string
+  onDateChange: (date: string) => void
 }
 
 export function EmployeeSessionModal({
@@ -34,7 +38,8 @@ export function EmployeeSessionModal({
   onClose,
   employeeName,
   employeeId,
-  date,
+  selectedDate,
+  onDateChange,
 }: EmployeeSessionModalProps) {
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(false)
@@ -52,36 +57,36 @@ export function EmployeeSessionModal({
       const mockSessions: Session[] = [
         {
           id: "1",
-          clockIn: new Date(`${date} 09:00:00`),
-          clockOut: new Date(`${date} 12:30:00`),
+          clockIn: new Date(`${selectedDate} 09:00:00`),
+          clockOut: new Date(`${selectedDate} 12:30:00`),
           type: "work",
           duration: 210, // 3.5 hours
         },
         {
           id: "2", 
-          clockIn: new Date(`${date} 12:30:00`),
-          clockOut: new Date(`${date} 13:30:00`),
+          clockIn: new Date(`${selectedDate} 12:30:00`),
+          clockOut: new Date(`${selectedDate} 13:30:00`),
           type: "break",
           duration: 60, // 1 hour lunch
         },
         {
           id: "3",
-          clockIn: new Date(`${date} 13:30:00`),
-          clockOut: new Date(`${date} 17:00:00`),
+          clockIn: new Date(`${selectedDate} 13:30:00`),
+          clockOut: new Date(`${selectedDate} 17:00:00`),
           type: "work", 
           duration: 210, // 3.5 hours
         },
         {
           id: "4",
-          clockIn: new Date(`${date} 17:00:00`),
-          clockOut: new Date(`${date} 17:15:00`),
+          clockIn: new Date(`${selectedDate} 17:00:00`),
+          clockOut: new Date(`${selectedDate} 17:15:00`),
           type: "break",
           duration: 15, // 15 min break
         },
         {
           id: "5",
-          clockIn: new Date(`${date} 17:15:00`),
-          clockOut: new Date(`${date} 18:30:00`),
+          clockIn: new Date(`${selectedDate} 17:15:00`),
+          clockOut: new Date(`${selectedDate} 18:30:00`),
           type: "work",
           duration: 75, // 1.25 hours
         },
@@ -107,10 +112,10 @@ export function EmployeeSessionModal({
   }
 
   useEffect(() => {
-    if (isOpen && employeeId && date) {
+    if (isOpen && employeeId && selectedDate) {
       loadSessionData()
     }
-  }, [isOpen, employeeId, date])
+  }, [isOpen, employeeId, selectedDate])
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', {
@@ -123,13 +128,10 @@ export function EmployeeSessionModal({
 
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60)
-    const mins = minutes % 60
-    const secs = 0 // For now, we're working with minute precision
+    const mins = Math.floor(minutes % 60)
+    const secs = Math.floor((minutes % 1) * 60) // Extract seconds from decimal part
     
-    if (hours > 0) {
-      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-    }
-    return `0:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
   const formatDate = (dateStr: string) => {
@@ -144,7 +146,15 @@ export function EmployeeSessionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogContent 
+        className="!max-w-none !w-[75vw] !h-[85vh] max-h-none overflow-y-auto p-6 sm:!max-w-none" 
+        style={{ 
+          width: '85vw', 
+          height: '85vh', 
+          maxWidth: 'none', 
+          maxHeight: 'none'
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
@@ -152,9 +162,25 @@ export function EmployeeSessionModal({
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
-            {formatDate(date)}
+            {formatDate(selectedDate)}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Date Selection */}
+        <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            <span className="text-sm font-medium">Select Date:</span>
+          </div>
+          <DatePicker
+            value={new Date(selectedDate)}
+            onChange={(date: Date | undefined) => {
+              if (date) {
+                onDateChange(date.toISOString().split('T')[0])
+              }
+            }}
+          />
+        </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-8">
@@ -176,7 +202,7 @@ export function EmployeeSessionModal({
                     {formatDuration(totalWorkTime)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {Math.round((totalWorkTime / 60) * 100) / 100} hours
+                    Total work duration
                   </p>
                 </CardContent>
               </Card>
@@ -193,7 +219,7 @@ export function EmployeeSessionModal({
                     {formatDuration(totalBreakTime)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {Math.round((totalBreakTime / 60) * 100) / 100} hours
+                    Total break duration
                   </p>
                 </CardContent>
               </Card>
@@ -210,7 +236,7 @@ export function EmployeeSessionModal({
                     {formatDuration(totalWorkTime + totalBreakTime)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Work + Breaks
+                    Combined duration
                   </p>
                 </CardContent>
               </Card>
