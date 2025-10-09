@@ -9,18 +9,20 @@ export default function EmployeeLeavePage() {
         <h1 className="text-3xl font-bold tracking-tight">My Leave Requests</h1>
         <p className="text-muted-foreground">Manage your leave requests and view balances</p>
       </div>
-      
-      {/* Leave Balances */}
+
+      {/* Leave Balances - count cards first */}
       <div>
         <h2 className="text-lg font-semibold mb-4">Leave Balances</h2>
         <LeaveBalanceCard />
       </div>
-      
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Request Form */}
+
+      {/* Apply Leave - form second */}
+      <div>
         <LeaveRequestForm />
-        
-        {/* Request History */}
+      </div>
+
+      {/* Applied Leave - table third */}
+      <div>
         <LeaveRequestList />
       </div>
     </div>

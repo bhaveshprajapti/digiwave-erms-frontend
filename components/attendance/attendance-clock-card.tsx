@@ -4,9 +4,11 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Clock, MapPin, LogIn, LogOut, Users, Timer, Coffee } from "lucide-react"
 import { checkIn, checkOut, getAttendanceStatus, AttendanceStatus } from "@/lib/api/attendances"
+import authService from "@/lib/auth"
+import api from "@/lib/api"
 
 export function AttendanceClockCard() {
   const { toast } = useToast()
@@ -17,6 +19,7 @@ export function AttendanceClockCard() {
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [liveWorkingTime, setLiveWorkingTime] = useState<string>("0:00:00")
   const [currentSessionStart, setCurrentSessionStart] = useState<Date | null>(null)
+  const [userShifts, setUserShifts] = useState<any[]>([])
 
   // Get user's location
   const getUserLocation = (): Promise<{ lat: number; lng: number }> => {
@@ -65,6 +68,80 @@ export function AttendanceClockCard() {
     }
   }
 
+  // Load user profile with shifts
+  const loadUserProfile = async () => {
+    const userData = authService.getUserData()
+    if (!userData?.id) return
+    
+    try {
+      const response = await api.get(`/accounts/users/${userData.id}/`)
+      const fullUser = response.data
+      setUserShifts(fullUser.shifts || [])
+    } catch (error) {
+      console.error('Error loading user profile:', error)
+    }
+  }
+
+  // Validate if current time is within shift hours
+  const validateShiftTiming = async () => {
+    if (userShifts.length === 0) {
+      // If no shifts assigned, allow check-in (fallback)
+      return { allowed: true, message: '' }
+    }
+
+    try {
+      // Fetch shift details
+      const shiftsResponse = await api.get('/common/shifts/')
+      const allShifts = shiftsResponse.data || []
+      
+      const now = new Date()
+      const currentTime = now.getHours() * 60 + now.getMinutes() // Current time in minutes
+      
+      // Check if current time falls within any assigned shift
+      for (const shiftId of userShifts) {
+        const shift = allShifts.find((s: any) => s.id === shiftId)
+        if (!shift) continue
+        
+        const [startHour, startMin] = shift.start_time.split(':').map(Number)
+        const [endHour, endMin] = shift.end_time.split(':').map(Number)
+        
+        let startTime = startHour * 60 + startMin
+        let endTime = endHour * 60 + endMin
+        
+        // Handle overnight shifts
+        if (shift.is_overnight && endTime < startTime) {
+          // For overnight shifts, check if current time is after start OR before end
+          if (currentTime >= startTime || currentTime <= endTime) {
+            return { allowed: true, message: '' }
+          }
+        } else {
+          // For regular shifts, check if current time is between start and end
+          if (currentTime >= startTime && currentTime <= endTime) {
+            return { allowed: true, message: '' }
+          }
+        }
+      }
+      
+      // If we reach here, current time is not within any shift
+      const shift = allShifts.find((s: any) => s.id === userShifts[0]) // Get first assigned shift
+      if (shift) {
+        return {
+          allowed: false,
+          message: `Check-in only allowed during shift hours: ${shift.start_time} - ${shift.end_time}`
+        }
+      }
+      
+      return {
+        allowed: false,
+        message: 'Check-in not allowed outside shift hours'
+      }
+    } catch (error) {
+      console.error('Error validating shift timing:', error)
+      // On error, allow check-in (fallback)
+      return { allowed: true, message: '' }
+    }
+  }
+
   // Initial setup effect
   useEffect(() => {
     setIsClient(true)
@@ -72,6 +149,9 @@ export function AttendanceClockCard() {
     
     // Load initial attendance status
     loadAttendanceStatus()
+
+    // Load user profile and shifts
+    loadUserProfile()
     
     // Get user location
     getUserLocation().then(setLocation).catch(() => {
@@ -141,6 +221,17 @@ export function AttendanceClockCard() {
     setIsLoading(true)
     
     try {
+      // Validate shift timing first
+      const validation = await validateShiftTiming()
+      if (!validation.allowed) {
+        toast({
+          title: "Check-in Restricted",
+          description: validation.message,
+          variant: "destructive",
+        })
+        return
+      }
+
       const locationData = location || { lat: 0, lng: 0 }
       const response = await checkIn({ location: locationData })
       
