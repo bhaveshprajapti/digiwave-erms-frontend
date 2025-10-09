@@ -66,13 +66,13 @@ export const navigationSections = [
         children: [
           { href: "/dashboard/employees", label: "All Employees" },
           { href: "/dashboard/profile-requests", label: "Profile Update Requests" },
-          { href: "/dashboard/leave", label: "Leave Management" },
-          { href: "/dashboard/leave/request", label: "Request Leave" },
-          { href: "/dashboard/attendance", label: "Attendance" },
-          { href: "/dashboard/admin/attendance", label: "Admin Attendance" },
-          { href: "/dashboard/admin/time-adjustments", label: "Time Adjustments" },
-          { href: "/dashboard/admin/approvals", label: "Approvals" },
-          { href: "/dashboard/admin/policies", label: "Leave Policies" },
+          // { href: "/dashboard/leave", label: "Leave Management" },
+          // { href: "/dashboard/leave/request", label: "Request Leave" },
+          // { href: "/dashboard/attendance", label: "Attendance" },
+          { href: "/dashboard/admin/attendance", label: "Attendance" },
+          // { href: "/dashboard/admin/time-adjustments", label: "Time Adjustments" },
+          // { href: "/dashboard/admin/approvals", label: "Approvals" },
+          { href: "/dashboard/admin/policies", label: "Leave Management" },
         ]
       },
       { href: "/dashboard/clients", label: "Client", icon: UserCircle },
@@ -102,8 +102,8 @@ export const navigationSections = [
     title: "ADMINISTRATION",
     items: [
       { href: "/dashboard/admin/settings", label: "Organization Settings", icon: Settings },
-      { href: "/dashboard/admin/roles", label: "Admin Roles", icon: Shield },
-      { href: "/dashboard/admin/audit", label: "Audit Logs", icon: FileBarChart },
+      // { href: "/dashboard/admin/roles", label: "Admin Roles", icon: Shield },
+      // { href: "/dashboard/admin/audit", label: "Audit Logs", icon: FileBarChart },
     ]
   },
 ]
