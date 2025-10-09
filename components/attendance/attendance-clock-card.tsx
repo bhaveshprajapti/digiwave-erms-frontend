@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { Clock, MapPin, LogIn, LogOut, Users, Timer, Coffee } from "lucide-react"
 import { checkIn, checkOut, getAttendanceStatus, AttendanceStatus } from "@/lib/api/attendances"
+import { getMyLeaveApplications } from "@/lib/api/leave-requests"
 import authService from "@/lib/auth"
 import api from "@/lib/api"
 
@@ -82,6 +83,69 @@ export function AttendanceClockCard() {
     }
   }
 
+  // Validate if user has approved leave for current date
+  const validateLeaveStatus = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+      
+      // Get all leave applications and filter for approved ones
+      const allLeaveApplications = await getMyLeaveApplications()
+      
+      // Check if user has approved leave for today (only status = 2 means approved)
+      const todayLeave = allLeaveApplications.find((leave: any) => {
+        const startDate = new Date(leave.start_date).toISOString().split('T')[0]
+        const endDate = new Date(leave.end_date).toISOString().split('T')[0]
+        
+        // Only consider approved leaves (status = 2) - rejected/pending should not block
+        const isApproved = leave.status === 2
+        const isToday = today >= startDate && today <= endDate
+        
+        return isApproved && isToday
+      })
+      
+      if (todayLeave) {
+        // For full-day leave, completely block check-in
+        if (!todayLeave.half_day_type) {
+          return {
+            allowed: false,
+            message: `You have approved full-day leave today. Check-in is not allowed.`
+          }
+        }
+        
+        // For half-day leave, check the timing
+        const now = new Date()
+        const currentHour = now.getHours()
+        
+        if (todayLeave.half_day_type === 'morning') {
+          // Morning half-day leave (typically 9 AM - 1 PM)
+          if (currentHour >= 9 && currentHour < 13) {
+            return {
+              allowed: false,
+              message: `You have approved morning half-day leave (9 AM - 1 PM). Check-in allowed after 1 PM.`
+            }
+          }
+        } else if (todayLeave.half_day_type === 'afternoon') {
+          // Afternoon half-day leave (typically 1 PM - 6 PM)
+          if (currentHour >= 13 && currentHour < 18) {
+            return {
+              allowed: false,
+              message: `You have approved afternoon half-day leave (1 PM - 6 PM). Check-in allowed before 1 PM.`
+            }
+          }
+        }
+        
+        // If it's half-day leave but outside the leave period, allow check-in
+        return { allowed: true, message: '' }
+      }
+      
+      return { allowed: true, message: '' }
+    } catch (error) {
+      console.error('Error validating leave status:', error)
+      // On error, allow check-in (fallback)
+      return { allowed: true, message: '' }
+    }
+  }
+
   // Validate if current time is within shift hours
   const validateShiftTiming = async () => {
     if (userShifts.length === 0) {
@@ -97,10 +161,14 @@ export function AttendanceClockCard() {
       const now = new Date()
       const currentTime = now.getHours() * 60 + now.getMinutes() // Current time in minutes
       
+      let validShifts = []
+      
       // Check if current time falls within any assigned shift
       for (const shiftId of userShifts) {
         const shift = allShifts.find((s: any) => s.id === shiftId)
         if (!shift) continue
+        
+        validShifts.push(shift)
         
         const [startHour, startMin] = shift.start_time.split(':').map(Number)
         const [endHour, endMin] = shift.end_time.split(':').map(Number)
@@ -108,9 +176,10 @@ export function AttendanceClockCard() {
         let startTime = startHour * 60 + startMin
         let endTime = endHour * 60 + endMin
         
-        // Handle overnight shifts
-        if (shift.is_overnight && endTime < startTime) {
-          // For overnight shifts, check if current time is after start OR before end
+        // Handle overnight shifts (e.g., 22:00 - 07:00)
+        if (endTime < startTime) {
+          // This is an overnight shift - spans across midnight
+          // Check if current time is after start (same day) OR before end (next day)
           if (currentTime >= startTime || currentTime <= endTime) {
             return { allowed: true, message: '' }
           }
@@ -123,11 +192,11 @@ export function AttendanceClockCard() {
       }
       
       // If we reach here, current time is not within any shift
-      const shift = allShifts.find((s: any) => s.id === userShifts[0]) // Get first assigned shift
-      if (shift) {
+      if (validShifts.length > 0) {
+        const shiftTimes = validShifts.map(s => `${s.start_time} - ${s.end_time}`).join(', ')
         return {
           allowed: false,
-          message: `Check-in only allowed during shift hours: ${shift.start_time} - ${shift.end_time}`
+          message: `Check-in only allowed during your assigned shift hours: ${shiftTimes}`
         }
       }
       
@@ -221,12 +290,23 @@ export function AttendanceClockCard() {
     setIsLoading(true)
     
     try {
-      // Validate shift timing first
-      const validation = await validateShiftTiming()
-      if (!validation.allowed) {
+      // Validate leave status first
+      const leaveValidation = await validateLeaveStatus()
+      if (!leaveValidation.allowed) {
         toast({
           title: "Check-in Restricted",
-          description: validation.message,
+          description: leaveValidation.message,
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Validate shift timing
+      const shiftValidation = await validateShiftTiming()
+      if (!shiftValidation.allowed) {
+        toast({
+          title: "Check-in Restricted",
+          description: shiftValidation.message,
           variant: "destructive",
         })
         return

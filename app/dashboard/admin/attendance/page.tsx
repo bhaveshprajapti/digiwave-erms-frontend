@@ -9,10 +9,8 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { AttendanceStatsCards } from "@/components/attendance/admin/attendance-stats-cards"
-import { AttendanceCharts } from "@/components/attendance/admin/attendance-charts"
 import { EmployeeSessionModal } from "@/components/attendance/admin/employee-session-modal"
-import { Eye, Calendar } from "lucide-react"
+import { Clock, Users, CheckCircle, AlertTriangle } from "lucide-react"
 
 export default function AdminAttendancePage() {
   const [rows, setRows] = useState<AttendanceDTO[]>([])
@@ -21,6 +19,12 @@ export default function AdminAttendancePage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<number>(20)
   const [totalCount, setTotalCount] = useState(0)
+  const [stats, setStats] = useState({
+    totalEmployees: 0,
+    presentToday: 0,
+    totalHours: 0,
+    avgHours: 0
+  })
 
   const [filterUser, setFilterUser] = useState<string>("")
   const [filterStart, setFilterStart] = useState<Date | undefined>()
@@ -31,8 +35,8 @@ export default function AdminAttendancePage() {
     isOpen: boolean
     employeeName: string
     employeeId: number
-    date: string
-  }>({ isOpen: false, employeeName: "", employeeId: 0, date: "" })
+    selectedDate: string
+  }>({ isOpen: false, employeeName: "", employeeId: 0, selectedDate: new Date().toISOString().split('T')[0] })
 
   const userOptions = useMemo(() => (employees || []).map((e: any) => ({ value: e.id, label: e.username || `${e.first_name} ${e.last_name}` })), [employees])
 
@@ -48,6 +52,27 @@ export default function AdminAttendancePage() {
       const data = await listAttendances(params)
       setRows(data.results)
       setTotalCount(data.count)
+      
+      // Calculate stats
+      const uniqueEmployees = new Set(data.results.map((r: any) => r.user)).size
+      const today = new Date().toISOString().split('T')[0]
+      const todayRecords = data.results.filter((r: any) => r.date === today)
+      const totalHours = data.results.reduce((sum: number, r: any) => {
+        if (r.total_hours) {
+          const match = r.total_hours.match(/^(\d{1,2}):(\d{2}):(\d{2})$/)
+          if (match) {
+            return sum + (parseInt(match[1]) + parseInt(match[2])/60 + parseInt(match[3])/3600)
+          }
+        }
+        return sum
+      }, 0)
+      
+      setStats({
+        totalEmployees: uniqueEmployees,
+        presentToday: todayRecords.length,
+        totalHours: Math.round(totalHours),
+        avgHours: uniqueEmployees > 0 ? Math.round(totalHours / uniqueEmployees * 10) / 10 : 0
+      })
     } finally { setLoading(false) }
   }
 
@@ -58,8 +83,13 @@ export default function AdminAttendancePage() {
     load()
   }, [filterUser, filterStart, filterEnd, page, pageSize])
 
-  const openSessionModal = (employeeId: number, employeeName: string, date: string) => {
-    setSessionModal({ isOpen: true, employeeId, employeeName, date })
+  const openSessionModal = (employeeId: number, employeeName: string) => {
+    setSessionModal({ 
+      isOpen: true, 
+      employeeId, 
+      employeeName, 
+      selectedDate: new Date().toISOString().split('T')[0] 
+    })
   }
 
   return (
@@ -69,9 +99,64 @@ export default function AdminAttendancePage() {
         <p className="text-muted-foreground">Monitor and analyze employee attendance patterns</p>
       </div>
       
-      {/* Analytics Section */}
-      <AttendanceStatsCards />
-      <AttendanceCharts />
+      {/* Stats Cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-card to-muted/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Employees</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.totalEmployees}</p>
+              </div>
+              <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-card to-muted/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Present Today</p>
+                <p className="text-2xl font-bold text-green-600">{stats.presentToday}</p>
+              </div>
+              <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-card to-muted/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Hours</p>
+                <p className="text-2xl font-bold text-purple-600">{stats.totalHours}h</p>
+              </div>
+              <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Clock className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-l-4 border-l-orange-500 bg-gradient-to-br from-card to-muted/20">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Avg Hours/Employee</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.avgHours}h</p>
+              </div>
+              <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-orange-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
       
       {/* Detailed Attendance Table */}
       <Card>
@@ -80,7 +165,7 @@ export default function AdminAttendancePage() {
         </CardHeader>
         <CardContent>
           <ManagementTable<AttendanceDTO>
-            title="Attendance"
+            title=""
             description=""
             items={rows}
             isLoading={loading}
@@ -97,9 +182,9 @@ export default function AdminAttendancePage() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    const headers = ['ID','User','Date','Total Hours','Notes']
+                    const headers = ['ID','User','Date','Total Hours']
                     const mapName = (uid: number) => userOptions.find(u => Number(u.value)===Number(uid))?.label || String(uid)
-                    const lines = rows.map(r => [r.id, mapName(r.user), r.date, r.total_hours ?? '', (r.notes ?? '').replaceAll('\n',' ')])
+                    const lines = rows.map(r => [r.id, mapName(r.user), r.date, r.total_hours ?? ''])
                     const csv = [headers.join(','), ...lines.map(arr => arr.map(x => `\"${String(x).replaceAll('\"','\"\"')}\"`).join(','))].join('\n')
                     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
                     const url = URL.createObjectURL(blob)
@@ -119,7 +204,7 @@ export default function AdminAttendancePage() {
                 return (
                   <button 
                     className="text-left hover:text-primary hover:underline font-medium"
-                    onClick={() => openSessionModal(r.user, userName, r.date)}
+                    onClick={() => openSessionModal(r.user, userName)}
                   >
                     {userName}
                   </button>
@@ -146,51 +231,26 @@ export default function AdminAttendancePage() {
                 const hours = r.total_hours
                 return (
                   <div className="space-y-1">
-                    <div className="font-medium">{hours ?? 'No record'}</div>
+                    <div className="font-medium font-mono text-lg">{hours ?? 'No record'}</div>
                     {hours && (
                       <div className="text-xs text-muted-foreground">
-                        {(() => {
-                          const match = hours.match(/^(\d{1,2}):(\d{2}):(\d{2})$/)
-                          if (match) {
-                            const h = parseInt(match[1])
-                            const m = parseInt(match[2])
-                            return `${(h + m/60).toFixed(1)} hrs`
-                          }
-                          return hours
-                        })()} 
+                        Total work duration
                       </div>
                     )}
                   </div>
                 )
               }},
-              { key: 'actions', header: 'Actions', className: 'w-24', cell: (r) => {
-                const userName = userOptions.find(u => Number(u.value)===Number(r.user))?.label || `User ${r.user}`
-                return (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openSessionModal(r.user, userName, r.date)}
-                    className="h-8 px-2"
-                  >
-                    <Eye className="h-3 w-3 mr-1" />
-                    Details
-                  </Button>
-                )
-              }},
-              { key: 'notes', header: 'Notes', cell: (r) => <span className="text-sm">{r.notes ?? '-'}</span> },
             ]}
             fields={[
               { key: 'user', label: 'User', type: 'select', options: userOptions },
               { key: 'date', label: 'Date', type: 'date' },
               { key: 'total_hours', label: 'Total Hours (HH:MM:SS)', type: 'time' },
-              { key: 'notes', label: 'Notes', type: 'text' },
             ]}
             onAdd={async (data) => {
               const payload = {
                 user: Number(data.user),
                 date: String(data.date),
                 total_hours: data.total_hours ? String(data.total_hours) : null,
-                notes: data.notes ? String(data.notes) : null,
               } as any
               await createAttendance(payload)
               await load()
@@ -200,7 +260,6 @@ export default function AdminAttendancePage() {
               if (data.user !== undefined) payload.user = Number(data.user)
               if (data.date !== undefined) payload.date = String(data.date)
               if (data.total_hours !== undefined) payload.total_hours = String(data.total_hours)
-              if (data.notes !== undefined) payload.notes = String(data.notes)
               await updateAttendance(id as number, payload)
               await load()
             }}
@@ -245,7 +304,8 @@ export default function AdminAttendancePage() {
         onClose={() => setSessionModal(prev => ({ ...prev, isOpen: false }))}
         employeeName={sessionModal.employeeName}
         employeeId={sessionModal.employeeId}
-        date={sessionModal.date}
+        selectedDate={sessionModal.selectedDate}
+        onDateChange={(date: string) => setSessionModal(prev => ({ ...prev, selectedDate: date }))}
       />
     </div>
   )

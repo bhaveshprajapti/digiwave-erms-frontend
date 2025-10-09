@@ -22,6 +22,7 @@ export function DateRangePicker({ start, end, onChangeStart, onChangeEnd, classN
           placeholder="Start"
           inputClassName="h-9 ps-10"
           className="min-w-[180px]"
+          displayFormat="DD/MM/YYYY"
         />
       </div>
       <span className="mx-2 text-gray-500">to</span>
@@ -32,6 +33,7 @@ export function DateRangePicker({ start, end, onChangeStart, onChangeEnd, classN
           placeholder="End"
           inputClassName="h-9 ps-10"
           className="min-w-[180px]"
+          displayFormat="DD/MM/YYYY"
         />
       </div>
     </div>

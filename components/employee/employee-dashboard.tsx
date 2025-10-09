@@ -22,6 +22,7 @@ import authService from "@/lib/auth"
 import api from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 import { checkIn, checkOut, getAttendanceStatus, AttendanceStatus } from "@/lib/api/attendances"
+import { getMyLeaveApplications } from "@/lib/api/leave-requests"
 import { Button } from "@/components/ui/button"
 
 export function EmployeeDashboard() {
@@ -55,12 +56,12 @@ export function EmployeeDashboard() {
         .catch(() => [])
 
       // Fetch leave requests (if API exists)
-      const leaveRequestsPromise = api.get(`/leave/leave-requests/?user=${userData.id}`)
+      const leaveRequestsPromise = api.get(`/leave/api/v1/applications/?user=${userData.id}`)
         .then(res => Array.isArray(res.data?.results) ? res.data.results : Array.isArray(res.data) ? res.data : [])
         .catch(() => [])
 
       // Fetch leave balances (if API exists) 
-      const leaveBalancesPromise = api.get('/leave/leave-balances/')
+      const leaveBalancesPromise = api.get('/leave/api/v1/balances/')
         .then(res => {
           const data = Array.isArray(res.data?.results) ? res.data.results : Array.isArray(res.data) ? res.data : []
           return data.filter((b: any) => Number(b.user) === Number(userData.id))
@@ -293,9 +294,10 @@ export function EmployeeDashboard() {
         let startTime = startHour * 60 + startMin
         let endTime = endHour * 60 + endMin
         
-        // Handle overnight shifts
-        if (shift.is_overnight && endTime < startTime) {
-          // For overnight shifts, check if current time is after start OR before end
+        // Handle overnight shifts (e.g., 22:00 - 07:00)
+        if (endTime < startTime) {
+          // This is an overnight shift - spans across midnight
+          // Check if current time is after start (same day) OR before end (next day)
           if (currentTime >= startTime || currentTime <= endTime) {
             return { allowed: true, message: '' }
           }
@@ -327,17 +329,91 @@ export function EmployeeDashboard() {
     }
   }
 
+  // Validate if user has approved leave for current date
+  const validateLeaveStatus = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+      
+      // Get all leave applications and filter for approved ones
+      const allLeaveApplications = await getMyLeaveApplications()
+      
+      // Check if user has approved leave for today (only status = 2 means approved)
+      const todayLeave = allLeaveApplications.find((leave: any) => {
+        const startDate = new Date(leave.start_date).toISOString().split('T')[0]
+        const endDate = new Date(leave.end_date).toISOString().split('T')[0]
+        
+        // Only consider approved leaves (status = 2) - rejected/pending should not block
+        const isApproved = leave.status === 2
+        const isToday = today >= startDate && today <= endDate
+        
+        return isApproved && isToday
+      })
+      
+      if (todayLeave) {
+        // For full-day leave, completely block check-in
+        if (!todayLeave.half_day_type) {
+          return {
+            allowed: false,
+            message: `You have approved full-day leave today. Check-in is not allowed.`
+          }
+        }
+        
+        // For half-day leave, check the timing
+        const now = new Date()
+        const currentHour = now.getHours()
+        
+        if (todayLeave.half_day_type === 'morning') {
+          // Morning half-day leave (typically 9 AM - 1 PM)
+          if (currentHour >= 9 && currentHour < 13) {
+            return {
+              allowed: false,
+              message: `You have approved morning half-day leave (9 AM - 1 PM). Check-in allowed after 1 PM.`
+            }
+          }
+        } else if (todayLeave.half_day_type === 'afternoon') {
+          // Afternoon half-day leave (typically 1 PM - 6 PM)
+          if (currentHour >= 13 && currentHour < 18) {
+            return {
+              allowed: false,
+              message: `You have approved afternoon half-day leave (1 PM - 6 PM). Check-in allowed before 1 PM.`
+            }
+          }
+        }
+        
+        // If it's half-day leave but outside the leave period, allow check-in
+        return { allowed: true, message: '' }
+      }
+      
+      return { allowed: true, message: '' }
+    } catch (error) {
+      console.error('Error validating leave status:', error)
+      // On error, allow check-in (fallback)
+      return { allowed: true, message: '' }
+    }
+  }
+
   const handleClockIn = async () => {
     if (isAttendanceLoading) return
     setIsAttendanceLoading(true)
     
     try {
-      // Validate shift timing first
-      const validation = await validateShiftTiming()
-      if (!validation.allowed) {
+      // Validate leave status first
+      const leaveValidation = await validateLeaveStatus()
+      if (!leaveValidation.allowed) {
         toast({
           title: "Check-in Restricted",
-          description: validation.message,
+          description: leaveValidation.message,
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Validate shift timing
+      const shiftValidation = await validateShiftTiming()
+      if (!shiftValidation.allowed) {
+        toast({
+          title: "Check-in Restricted",
+          description: shiftValidation.message,
           variant: "destructive",
         })
         return
