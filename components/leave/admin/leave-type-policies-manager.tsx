@@ -218,36 +218,43 @@ export function LeaveTypePoliciesManager() {
     {
       key: 'leave_type',
       header: 'Leave Type',
+      sortable: true,
       cell: (policy: LeavePolicy) => getLeaveTypeNames(policy.leave_type)
     },
     {
       key: 'annual_quota',
       header: 'Annual Quota',
-      sortable: true
+      sortable: true,
+      cell: (policy: LeavePolicy) => `${policy.annual_quota || 0} days`
     },
     {
       key: 'monthly_accrual',
       header: 'Monthly Accrual',
-      sortable: true
+      sortable: true,
+      cell: (policy: LeavePolicy) => `${policy.monthly_accrual || 0} days`
     },
     {
       key: 'carry_forward_limit',
-      header: 'Carry Forward Limit',
-      sortable: true
+      header: 'Carry Forward',
+      sortable: true,
+      cell: (policy: LeavePolicy) => `${policy.carry_forward_limit || 0} days`
     },
     {
       key: 'notice_days',
       header: 'Notice Days',
-      sortable: true
+      sortable: true,
+      cell: (policy: LeavePolicy) => `${policy.notice_days || 0} days`
     },
     {
       key: 'max_consecutive',
       header: 'Max Consecutive',
-      sortable: true
+      sortable: true,
+      cell: (policy: LeavePolicy) => `${policy.max_consecutive || 0} days`
     },
     {
       key: 'is_active',
       header: 'Status',
+      sortable: true,
       cell: (policy: LeavePolicy) => (
         <Badge variant={policy.is_active ? "default" : "secondary"}>
           {policy.is_active ? "Active" : "Inactive"}
@@ -275,7 +282,7 @@ export function LeaveTypePoliciesManager() {
           <div>
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              Leave Type Policies Management
+              Leave Policies Management
             </CardTitle>
             <CardDescription>
               Configure leave-type specific policies with detailed rules and restrictions

@@ -8,9 +8,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DataTable } from "@/components/common/data-table"
+import { ActionButtons } from "@/components/common/action-buttons"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { Clock, Plus, Edit, Trash2 } from "lucide-react"
+import { Clock, Plus } from "lucide-react"
 import { 
   getFlexibleTimingTypes, 
   FlexibleTimingType,
@@ -139,48 +140,42 @@ export function FlexibleTimingTypesManager() {
   }
 
   const columns = [
-    { key: 'name', header: 'Name' },
-    { key: 'code', header: 'Code' },
-    { key: 'description', header: 'Description' },
+    { key: 'name', header: 'Name', sortable: true },
+    { key: 'code', header: 'Code', sortable: true },
+    { key: 'description', header: 'Description', sortable: true },
     { 
       key: 'max_duration_minutes', 
       header: 'Max Duration',
+      sortable: true,
       cell: (type: FlexibleTimingType) => `${type.max_duration_minutes} min`
     },
     { 
       key: 'max_per_month', 
       header: 'Monthly Limit',
+      sortable: true,
       cell: (type: FlexibleTimingType) => `${type.max_per_month} requests`
     },
     {
       key: 'requires_approval',
       header: 'Requires Approval',
+      sortable: true,
       cell: (type: FlexibleTimingType) => type.requires_approval ? 'Yes' : 'No'
     },
     {
       key: 'advance_notice_hours',
       header: 'Notice Required',
+      sortable: true,
       cell: (type: FlexibleTimingType) => `${type.advance_notice_hours} hours`
     },
     {
       key: 'actions',
-      header: 'Actions',
+      header: <span className="block text-center">Actions</span>,
       cell: (type: FlexibleTimingType) => (
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleEdit(type)}
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => handleDelete(type)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center justify-center">
+          <ActionButtons
+            onEdit={() => handleEdit(type)}
+            onDelete={() => handleDelete(type)}
+          />
         </div>
       )
     }

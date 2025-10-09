@@ -21,9 +21,10 @@ interface DataTableProps<T> {
   striped?: boolean
   className?: string
   pageSize?: number // enable simple client-side pagination if provided
+  loading?: boolean
 }
 
-export function DataTable<T>({ columns, data, getRowKey, emptyText = "No records found.", striped = false, className, pageSize }: DataTableProps<T>) {
+export function DataTable<T>({ columns, data, getRowKey, emptyText = "No records found.", striped = false, className, pageSize, loading = false }: DataTableProps<T>) {
   const [sortKey, setSortKey] = React.useState<string | null>(null)
   const [sortDir, setSortDir] = React.useState<"asc" | "desc">("asc")
   const [page, setPage] = React.useState(1)
@@ -84,14 +85,21 @@ export function DataTable<T>({ columns, data, getRowKey, emptyText = "No records
           </TableRow>
         </TableHeader>
         <TableBody>
-          {(paged.length === 0) && (
+          {loading && (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
+                Loading...
+              </TableCell>
+            </TableRow>
+          )}
+          {!loading && (paged.length === 0) && (
             <TableRow>
               <TableCell colSpan={columns.length} className="text-center py-8 text-muted-foreground">
                 {emptyText}
               </TableCell>
             </TableRow>
           )}
-          {paged.map((item, idx) => (
+          {!loading && paged.map((item, idx) => (
             <TableRow key={getRowKey(item, (page - 1) * (pageSize ?? 0) + idx)} className={cn("transition-colors", striped && idx % 2 === 1 ? "bg-muted/30" : undefined)}>
               {columns.map(col => (
                 <TableCell key={col.key} className={col.className}>
