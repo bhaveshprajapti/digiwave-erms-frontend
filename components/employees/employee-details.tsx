@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Mail, Phone, MapPin, Calendar, Briefcase, Clock, FileText } from "lucide-react"
+import { Mail, Phone, MapPin, Calendar, Briefcase, Clock, FileText, RefreshCw } from "lucide-react"
 import api from "@/lib/api"
 import { useEmployeeTypes, useRoles, useShifts, useTechnologies } from "@/hooks/use-common"
 import { useDesignations } from "@/hooks/use-designations"
@@ -151,13 +152,21 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
     }
   }
 
+  // Add refresh mechanism
+  const [refreshKey, setRefreshKey] = useState(0)
+  
+  // Function to manually refresh data
+  const refreshEmployeeData = () => {
+    setRefreshKey(prev => prev + 1)
+  }
+
   useEffect(() => {
     const fetchEmployeeData = async () => {
       try {
         setLoading(true)
         
-        // Fetch employee data
-        const employeeResponse = await api.get(`/accounts/users/${employeeId}/`)
+        // Fetch employee data with cache busting
+        const employeeResponse = await api.get(`/accounts/users/${employeeId}/?_t=${Date.now()}`)
         const employeeData = employeeResponse.data
         setEmployee(employeeData)
         
@@ -208,7 +217,7 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
     }
 
     fetchEmployeeData()
-  }, [employeeId])
+  }, [employeeId, refreshKey])
 
   if (loading) {
     return (
@@ -247,17 +256,29 @@ export function EmployeeDetails({ employeeId }: EmployeeDetailsProps) {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 space-y-4">
-              <div>
-                <h3 className="text-2xl font-bold">
-                  {employee?.first_name || employee?.name || 'Employee'}
-                  {employee?.last_name && ` ${employee.last_name}`}
-                </h3>
-                <p className="text-muted-foreground">
-                  {employee?.designation || 
-                   (typeof employee?.employee_type === 'object' ? 
-                    (employee.employee_type as any)?.name : employee?.employee_type) || 
-                   'Employee'}
-                </p>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold">
+                    {employee?.first_name || employee?.name || 'Employee'}
+                    {employee?.last_name && ` ${employee.last_name}`}
+                  </h3>
+                  <p className="text-muted-foreground">
+                    {employee?.designation || 
+                     (typeof employee?.employee_type === 'object' ? 
+                      (employee.employee_type as any)?.name : employee?.employee_type) || 
+                     'Employee'}
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={refreshEmployeeData}
+                  disabled={loading}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge variant="default">{employeeTypeName}</Badge>

@@ -23,6 +23,7 @@ import api from "@/lib/api"
 
 interface ProfileUpdateRequest {
   id: number
+  user: number
   user_name: string
   user_email: string
   field_name?: string // For backward compatibility with old requests
@@ -364,94 +365,109 @@ export function ProfileRequestsManagement() {
                 })()}
                 {filteredRequests
                   .filter(r => r.user === selectedUser.user_id)
-                  .map((request) => (
-                    <div key={request.id} className="border rounded-lg p-4">
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                            {request.field_name === 'multiple_fields' ? 
-                              'Multiple Fields' : 
-                              request.changes ? 
-                                `${request.changes.length} field(s)` : 
+                  .map((request) => {
+                    // Parse the changes from new_value if it's a multiple_fields request
+                    let parsedChanges: Array<{field: string, old_value: string, new_value: string}> = []
+                    
+                    if (request.field_name === 'multiple_fields' && request.new_value) {
+                      // Parse format: "field1: old → new, field2: old → new"
+                      const changeItems = request.new_value.split(', ')
+                      changeItems.forEach(item => {
+                        const match = item.match(/(\w+):\s*"([^"]*?)"\s*→\s*"([^"]*?)"/)
+                        if (match) {
+                          parsedChanges.push({
+                            field: match[1],
+                            old_value: match[2],
+                            new_value: match[3]
+                          })
+                        }
+                      })
+                    }
+                    
+                    return (
+                      <div key={request.id} className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-4 py-3 border-b flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline" className="bg-white text-blue-700 border-blue-300 font-semibold">
+                              {request.field_name === 'multiple_fields' ? 
+                                `Multiple Fields Update (${parsedChanges.length} changes)` : 
                                 formatFieldName(request.field_name || 'Unknown')}
-                          </Badge>
-                          {getStatusBadge(request.status)}
+                            </Badge>
+                            {getStatusBadge(request.status)}
+                          </div>
+                          <span className="text-xs text-gray-600">
+                            Requested: {new Date(request.requested_at).toLocaleString()}
+                          </span>
                         </div>
                         
-                        {/* Handle consolidated requests */}
-                        {request.field_name === 'multiple_fields' ? (
-                          <div className="space-y-3">
-                            <div>
-                              <Label>Summary</Label>
-                              <div className="p-2 bg-gray-50 border rounded text-sm">
-                                {request.old_value || 'Multiple field changes'}
-                              </div>
-                            </div>
-                            <div>
-                              <Label>Changes Details</Label>
-                              <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
-                                {request.new_value || request.reason || 'Multiple field changes'}
-                              </div>
-                            </div>
-                          </div>
-                        ) : request.changes ? (
-                          <div className="space-y-3">
-                            <div>
-                              <Label>Changes Summary</Label>
-                              <div className="p-3 bg-gray-50 border rounded text-sm whitespace-pre-line">
-                                {request.details || 'Multiple field changes'}
-                              </div>
-                            </div>
-                            
-                            {/* Individual changes breakdown */}
-                            <div className="space-y-2">
-                              <Label>Individual Changes</Label>
-                              {request.changes.map((change, idx) => (
-                                <div key={idx} className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2 bg-white border rounded">
-                                  <div>
-                                    <Label className="text-red-600 text-xs">{formatFieldName(change.field)} - Current</Label>
-                                    <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
-                                      {change.old_value || 'Empty'}
-                                    </div>
+                        {/* Body */}
+                        <div className="p-4 space-y-4">
+                          {request.field_name === 'multiple_fields' && parsedChanges.length > 0 ? (
+                            <div className="space-y-3">
+                              {/* Form-like display for each field */}
+                              {parsedChanges.map((change, idx) => (
+                                <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                  <div className="mb-2">
+                                    <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                      <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+                                        {idx + 1}
+                                      </span>
+                                      {formatFieldName(change.field)}
+                                    </Label>
                                   </div>
-                                  <div>
-                                    <Label className="text-green-600 text-xs">{formatFieldName(change.field)} - New</Label>
-                                    <div className="p-2 bg-green-50 border border-green-200 rounded text-sm">
-                                      {change.new_value}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <Label className="text-xs text-red-700 font-medium mb-1 block">From (Current)</Label>
+                                      <div className="p-3 bg-red-50 border-2 border-red-200 rounded text-sm min-h-[50px] flex items-center">
+                                        {change.old_value || <span className="text-gray-400 italic">Empty</span>}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs text-green-700 font-medium mb-1 block">To (Requested)</Label>
+                                      <div className="p-3 bg-green-50 border-2 border-green-200 rounded text-sm min-h-[50px] flex items-center font-medium">
+                                        {change.new_value}
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
                               ))}
                             </div>
-                          </div>
-                        ) : (
-                          /* Handle legacy single field requests */
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-red-600">Current Value</Label>
-                              <div className="p-2 bg-red-50 border border-red-200 rounded text-sm">
-                                {request.old_value || 'Empty'}
+                          ) : (
+                            /* Handle legacy single field requests */
+                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                              <div className="mb-3">
+                                <Label className="text-sm font-semibold text-gray-700">
+                                  {formatFieldName(request.field_name || 'Field')}
+                                </Label>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-xs text-red-700 font-medium mb-1 block">From (Current)</Label>
+                                  <div className="p-3 bg-red-50 border-2 border-red-200 rounded text-sm min-h-[50px] flex items-center">
+                                    {request.old_value || <span className="text-gray-400 italic">Empty</span>}
+                                  </div>
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-green-700 font-medium mb-1 block">To (Requested)</Label>
+                                  <div className="p-3 bg-green-50 border-2 border-green-200 rounded text-sm min-h-[50px] flex items-center font-medium">
+                                    {request.new_value}
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <div>
-                              <Label className="text-green-600">New Value</Label>
-                              <div className="p-2 bg-green-50 border border-green-200 rounded text-sm">
-                                {request.new_value}
-                              </div>
+                          )}
+                          
+                          {request.admin_comment && (
+                            <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+                              <Label className="text-xs font-semibold text-yellow-900 mb-1 block">Admin Comment</Label>
+                              <p className="text-sm text-gray-700">{request.admin_comment}</p>
                             </div>
-                          </div>
-                        )}
-                        {request.reason && (
-                          <div>
-                            <Label>Reason</Label>
-                            <div className="p-2 bg-gray-50 border rounded text-sm">
-                              {request.reason}
-                            </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
               </div>
             </div>
 

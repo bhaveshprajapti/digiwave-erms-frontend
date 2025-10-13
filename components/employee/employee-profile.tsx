@@ -22,7 +22,8 @@ import {
   Save,
   AlertCircle,
   CheckCircle,
-  Clock
+  Clock,
+  XCircle
 } from "lucide-react"
 import api from "@/lib/api"
 import authService from "@/lib/auth"
@@ -122,6 +123,12 @@ export function EmployeeProfile() {
         field: item.field ?? item.field_name ?? ''
       }))
       setPendingRequests(normalized)
+      
+      // If there are approved requests, reload the user profile to show updated data
+      const hasApproved = normalized.some((req: any) => req.status === 'approved')
+      if (hasApproved) {
+        await loadUserProfile()
+      }
     } catch (error) {
       console.error("Error loading pending requests:", error)
       // Fallback to empty array
@@ -171,7 +178,7 @@ export function EmployeeProfile() {
         field_name: 'multiple_fields',
         old_value: `Multiple fields (${changes.length} changes)`,
         new_value: changesDetails,
-        reason: `Profile update request with ${changes.length} field(s): ${changesDetails}`,
+        reason: '',  // Reason not required
         document_link: requestDocumentLink || undefined
       }
       
@@ -566,55 +573,153 @@ export function EmployeeProfile() {
               {pendingRequests.length === 0 ? (
                 <div className="text-center py-8">
                   <CheckCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No pending profile update requests</p>
+                  <p className="text-gray-500">No profile update requests</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {pendingRequests.map((request, index) => (
-                    <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium capitalize">
-                            {(request.field?.replace?.('_', ' ') || request.field_name?.replace?.('_', ' ') || 'Field')} Update
-                          </p>
-                          <div className="text-sm text-gray-600 mt-1">
-                            <p><span className="font-medium">From:</span> {request.old_value}</p>
-                            <p><span className="font-medium">To:</span> {request.new_value}</p>
-                            {request.document_link && (
-                              <p>
-                                <span className="font-medium">Document:</span>{' '}
-                                <a
-                                  href={request.document_link}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 underline"
-                                >
-                                  {request.document_link}
-                                </a>
-                              </p>
-                            )}
+                  {pendingRequests.map((request, index) => {
+                    // Parse the changes from new_value if it's a multiple_fields request
+                    let parsedChanges: Array<{field: string, old_value: string, new_value: string}> = []
+                    const fieldName = request.field || request.field_name || 'unknown'
+                    
+                    if (fieldName === 'multiple_fields' && request.new_value) {
+                      // Parse format: "field1: old → new, field2: old → new"
+                      const changeItems = request.new_value.split(', ')
+                      changeItems.forEach((item: string) => {
+                        const match = item.match(/(\w+):\s*"([^"]*?)"\s*→\s*"([^"]*?)"/)
+                        if (match) {
+                          parsedChanges.push({
+                            field: match[1],
+                            old_value: match[2],
+                            new_value: match[3]
+                          })
+                        }
+                      })
+                    }
+                    
+                    const formatFieldName = (field: string) => {
+                      return field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+                    }
+                    
+                    const getStatusBadge = (status: string) => {
+                      switch (status) {
+                        case 'pending':
+                          return (
+                            <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Pending
+                            </Badge>
+                          )
+                        case 'approved':
+                          return (
+                            <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Approved
+                            </Badge>
+                          )
+                        case 'rejected':
+                          return (
+                            <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Rejected
+                            </Badge>
+                          )
+                        default:
+                          return <Badge variant="outline">{status}</Badge>
+                      }
+                    }
+                    
+                    return (
+                      <div key={index} className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-4 py-3 border-b flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline" className="bg-white text-blue-700 border-blue-300 font-semibold">
+                              {fieldName === 'multiple_fields' ? 
+                                `Multiple Fields Update (${parsedChanges.length} changes)` : 
+                                formatFieldName(fieldName)}
+                            </Badge>
+                            {getStatusBadge(request.status)}
                           </div>
+                          <span className="text-xs text-gray-600">
+                            {new Date(request.requested_at).toLocaleString()}
+                          </span>
                         </div>
-                        <div className="text-right">
-                          <Badge 
-                            variant="secondary"
-                            className={`capitalize ${
-                              request.status === 'approved' 
-                                ? 'bg-green-100 text-green-800 border-green-200'
-                                : request.status === 'rejected'
-                                ? 'bg-red-100 text-red-800 border-red-200'
-                                : 'bg-orange-100 text-orange-800 border-orange-200'
-                            }`}
-                          >
-                            {request.status}
-                          </Badge>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {new Date(request.requested_at).toLocaleDateString()}
-                          </p>
+                        
+                        {/* Body */}
+                        <div className="p-4 space-y-4">
+                          {fieldName === 'multiple_fields' && parsedChanges.length > 0 ? (
+                            <div className="space-y-3">
+                              {/* Form-like display for each field */}
+                              {parsedChanges.map((change, idx) => (
+                                <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                  <div className="mb-2">
+                                    <Label className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                                      <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded">
+                                        {idx + 1}
+                                      </span>
+                                      {formatFieldName(change.field)}
+                                    </Label>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <Label className="text-xs text-red-700 font-medium mb-1 block">From (Current)</Label>
+                                      <div className="p-3 bg-red-50 border-2 border-red-200 rounded text-sm min-h-[50px] flex items-center">
+                                        {change.old_value || <span className="text-gray-400 italic">Empty</span>}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <Label className="text-xs text-green-700 font-medium mb-1 block">To (Requested)</Label>
+                                      <div className="p-3 bg-green-50 border-2 border-green-200 rounded text-sm min-h-[50px] flex items-center font-medium">
+                                        {change.new_value}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            /* Handle legacy single field requests */
+                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                              <div className="mb-3">
+                                <Label className="text-sm font-semibold text-gray-700">
+                                  {formatFieldName(fieldName)}
+                                </Label>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-xs text-red-700 font-medium mb-1 block">From (Current)</Label>
+                                  <div className="p-3 bg-red-50 border-2 border-red-200 rounded text-sm min-h-[50px] flex items-center">
+                                    {request.old_value || <span className="text-gray-400 italic">Empty</span>}
+                                  </div>
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-green-700 font-medium mb-1 block">To (Requested)</Label>
+                                  <div className="p-3 bg-green-50 border-2 border-green-200 rounded text-sm min-h-[50px] flex items-center font-medium">
+                                    {request.new_value}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          {request.document_link && (
+                            <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                              <Label className="text-xs font-semibold text-blue-900 mb-1 block">Supporting Document</Label>
+                              <a
+                                href={request.document_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:underline break-all"
+                              >
+                                {request.document_link}
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
