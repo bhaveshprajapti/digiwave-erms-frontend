@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -18,7 +17,6 @@ import {
   Calendar,
   TrendingUp,
   Award,
-  Eye,
   User
 } from "lucide-react"
 import { getLeaveBalances, assignLeaveBalances } from "@/lib/api/leave-balances"
@@ -177,8 +175,20 @@ export function LeaveBalanceManager() {
 
     console.log(`User ${user.id}: totalAvailable=${totalAvailable}, totalUsed=${totalUsed}, totalRemaining=${totalRemaining}`)
 
-    // Default to unknown status since we're not fetching summaries
-    const complianceStatus: 'compliant' | 'violations' | 'unknown' = 'unknown'
+    // Calculate compliance status based on balance data
+    let complianceStatus: 'compliant' | 'violations' | 'unknown' = 'compliant'
+    
+    // Check for violations (negative balances or over-usage)
+    const hasViolations = userBalances.some(balance => {
+      const remaining = Number(balance.remaining_balance) || 0
+      return remaining < 0
+    })
+    
+    if (hasViolations) {
+      complianceStatus = 'violations'
+    } else if (userBalances.length === 0) {
+      complianceStatus = 'unknown'
+    }
 
     return {
       user,
@@ -220,19 +230,16 @@ export function LeaveBalanceManager() {
       key: 'employee',
       header: 'Employee',
       cell: (employeeGroup: EmployeeBalanceGroup) => (
-        <Button
-          variant="ghost"
-          className="h-auto p-0 text-left justify-start hover:bg-transparent"
+        <div
+          className="flex items-center gap-2 cursor-pointer"
           onClick={() => handleViewEmployeeDetails(employeeGroup)}
         >
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            <div>
-              <div className="font-medium">{employeeGroup.user.first_name} {employeeGroup.user.last_name}</div>
-              <div className="text-sm text-gray-500">{employeeGroup.user.username}</div>
-            </div>
+          <User className="h-4 w-4" />
+          <div>
+            <div className="font-medium hover:text-blue-600 hover:underline transition-colors">{employeeGroup.user.first_name} {employeeGroup.user.last_name}</div>
+            <div className="text-sm text-gray-500">{employeeGroup.user.username}</div>
           </div>
-        </Button>
+        </div>
       )
     },
     ...getLeaveTypeColumns(),
@@ -284,22 +291,6 @@ export function LeaveBalanceManager() {
            employeeGroup.complianceStatus === 'violations' ? 'Violations' : 'Unknown'}
         </Badge>
       )
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      cell: (employeeGroup: EmployeeBalanceGroup) => (
-        <div className="flex items-center justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleViewEmployeeDetails(employeeGroup)}
-          >
-            <Eye className="h-4 w-4 mr-2" />
-            View
-          </Button>
-        </div>
-      )
     }
   ]
 
@@ -313,9 +304,6 @@ export function LeaveBalanceManager() {
                 <Database className="h-5 w-5" />
                 Leave Balance Management
               </CardTitle>
-              <CardDescription>
-                Manage leave balances for all employees based on active policies
-              </CardDescription>
             </div>
             <div className="flex gap-2">
               <Button
@@ -334,17 +322,17 @@ export function LeaveBalanceManager() {
                     Assign Balances
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[500px]">
-                  <DialogHeader>
-                    <DialogTitle>Assign Leave Balances</DialogTitle>
-                    <DialogDescription>
+                <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader className="pb-4">
+                    <DialogTitle className="text-xl">Assign Leave Balances</DialogTitle>
+                    <DialogDescription className="text-sm">
                       Assign leave balances to selected users based on active policies
                     </DialogDescription>
                   </DialogHeader>
 
-                  <form onSubmit={handleAssignBalances} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="year">Year</Label>
+                  <form onSubmit={handleAssignBalances} className="space-y-6 py-4">
+                    <div className="space-y-3">
+                      <Label htmlFor="year" className="text-sm font-semibold">Year</Label>
                       <Input
                         id="year"
                         type="number"
@@ -355,12 +343,13 @@ export function LeaveBalanceManager() {
                           ...prev,
                           year: parseInt(e.target.value) || new Date().getFullYear()
                         }))}
+                        className="h-10"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>Select Users</Label>
-                      <div className="max-h-40 overflow-y-auto border rounded-md p-2">
+                    <div className="space-y-3">
+                      <Label className="text-sm font-semibold">Select Users</Label>
+                      <div className="max-h-48 overflow-y-auto border rounded-md p-3">
                         {users.map((user: Employee) => (
                           <div key={user.id} className="flex items-center space-x-2 py-1">
                             <input
@@ -389,7 +378,7 @@ export function LeaveBalanceManager() {
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-3 pt-2 pb-2 border-t border-b">
                       <input
                         type="checkbox"
                         id="force_reset"
@@ -398,15 +387,16 @@ export function LeaveBalanceManager() {
                           ...prev,
                           force_reset: e.target.checked
                         }))}
+                        className="h-4 w-4"
                       />
-                      <Label htmlFor="force_reset">Force reset existing balances</Label>
+                      <Label htmlFor="force_reset" className="text-sm font-medium cursor-pointer">Force reset existing balances</Label>
                     </div>
 
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setAssignmentDialogOpen(false)}>
+                    <DialogFooter className="gap-3 pt-4">
+                      <Button type="button" variant="outline" onClick={() => setAssignmentDialogOpen(false)} className="min-w-[100px]">
                         Cancel
                       </Button>
-                      <Button type="submit" disabled={assigning}>
+                      <Button type="submit" disabled={assigning} className="min-w-[140px]">
                         {assigning ? 'Assigning...' : 'Assign Balances'}
                       </Button>
                     </DialogFooter>
@@ -417,30 +407,22 @@ export function LeaveBalanceManager() {
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="balances" className="w-full">
-            <TabsList className="grid w-full grid-cols-1">
-              <TabsTrigger value="balances">Leave Balances</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="balances" className="space-y-4">
-              {loading ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="text-center">
-                    <Database className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />
-                    <p className="text-gray-500">Loading leave balances...</p>
-                  </div>
-                </div>
-              ) : (
-                <DataTable
-                  columns={columns}
-                  data={employeeBalanceGroups}
-                  getRowKey={(group: EmployeeBalanceGroup) => group.user.id}
-                  striped
-                  pageSize={20}
-                />
-              )}
-            </TabsContent>
-          </Tabs>
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="text-center">
+                <Database className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />
+                <p className="text-gray-500">Loading leave balances...</p>
+              </div>
+            </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={employeeBalanceGroups}
+              getRowKey={(group: EmployeeBalanceGroup) => group.user.id}
+              striped
+              pageSize={20}
+            />
+          )}
         </CardContent>
       </Card>
 

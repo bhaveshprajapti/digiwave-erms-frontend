@@ -14,12 +14,12 @@ export const getAvailableLeaveTypes = async (): Promise<LeaveType[]> => {
   return res.data
 }
 
-export const createLeaveType = async (data: Omit<LeaveType, "id" | "created_at">): Promise<LeaveType> => {
+export const createLeaveType = async (data: Omit<LeaveType, "id" | "created_at" | "updated_at" | "policies_count">): Promise<LeaveType> => {
   const res: AxiosResponse<LeaveType> = await api.post(base, data)
   return res.data
 }
 
-export const updateLeaveType = async (id: number, data: Partial<Omit<LeaveType, "id">>): Promise<LeaveType> => {
+export const updateLeaveType = async (id: number, data: Partial<Omit<LeaveType, "id" | "created_at" | "updated_at" | "policies_count">>): Promise<LeaveType> => {
   const res: AxiosResponse<LeaveType> = await api.patch(`${base}${id}/`, data)
   return res.data
 }

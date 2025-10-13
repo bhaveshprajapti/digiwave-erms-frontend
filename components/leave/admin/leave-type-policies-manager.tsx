@@ -70,6 +70,8 @@ export function LeaveTypePoliciesManager() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState<number | null>(null)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const fetchData = async () => {
     try {
@@ -98,6 +100,7 @@ export function LeaveTypePoliciesManager() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setFormErrors({}) // Clear previous errors
     
     if (!formData.name.trim() || formData.leave_type === 0) {
       toast({
@@ -130,11 +133,37 @@ export function LeaveTypePoliciesManager() {
       fetchData()
       
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error?.response?.data?.message || "Failed to save policy",
-        variant: "destructive"
-      })
+      const errorData = error?.response?.data
+      
+      // Handle field-specific validation errors
+      if (errorData && typeof errorData === 'object') {
+        const errors: Record<string, string> = {}
+        
+        Object.keys(errorData).forEach(key => {
+          if (Array.isArray(errorData[key])) {
+            errors[key] = errorData[key][0]
+          } else if (typeof errorData[key] === 'string') {
+            errors[key] = errorData[key]
+          }
+        })
+        
+        setFormErrors(errors)
+        
+        // Show toast for general errors
+        if (errorData.detail || errorData.message) {
+          toast({
+            title: "Error",
+            description: errorData.detail || errorData.message,
+            variant: "destructive"
+          })
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save policy",
+          variant: "destructive"
+        })
+      }
     } finally {
       setSaving(false)
     }
@@ -189,6 +218,27 @@ export function LeaveTypePoliciesManager() {
   const resetForm = () => {
     setFormData(defaultFormData)
     setEditingId(null)
+    setFormErrors({})
+  }
+
+  const handleStatusToggle = async (policy: LeavePolicy) => {
+    setUpdatingStatus(policy.id)
+    try {
+      await updateLeavePolicy(policy.id, { is_active: !policy.is_active })
+      toast({
+        title: "Success",
+        description: `Policy ${!policy.is_active ? 'activated' : 'deactivated'} successfully`
+      })
+      fetchData()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to update status",
+        variant: "destructive"
+      })
+    } finally {
+      setUpdatingStatus(null)
+    }
   }
 
   // Get available leave types (not used in existing policies, except for current policy when editing)
@@ -256,9 +306,16 @@ export function LeaveTypePoliciesManager() {
       header: 'Status',
       sortable: true,
       cell: (policy: LeavePolicy) => (
-        <Badge variant={policy.is_active ? "default" : "secondary"}>
-          {policy.is_active ? "Active" : "Inactive"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={policy.is_active}
+            onCheckedChange={() => handleStatusToggle(policy)}
+            disabled={updatingStatus === policy.id}
+          />
+          <span className={`text-sm font-medium ${policy.is_active ? 'text-green-600' : 'text-gray-500'}`}>
+            {policy.is_active ? 'Active' : 'Inactive'}
+          </span>
+        </div>
       )
     },
     {
@@ -284,9 +341,6 @@ export function LeaveTypePoliciesManager() {
               <Settings className="h-5 w-5" />
               Leave Policies Management
             </CardTitle>
-            <CardDescription>
-              Configure leave-type specific policies with detailed rules and restrictions
-            </CardDescription>
           </div>
           <div className="flex gap-2">
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -296,12 +350,12 @@ export function LeaveTypePoliciesManager() {
                   Add Policy
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>
+              <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader className="pb-4">
+                  <DialogTitle className="text-xl">
                     {editingId ? 'Edit Leave Policy' : 'Create Leave Policy'}
                   </DialogTitle>
-                  <DialogDescription>
+                  <DialogDescription className="text-sm">
                     {editingId 
                       ? 'Update the policy information below'
                       : 'Create a new leave policy'
@@ -309,126 +363,144 @@ export function LeaveTypePoliciesManager() {
                   </DialogDescription>
                 </DialogHeader>
                 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Policy Name *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      placeholder="Standard Annual Leave Policy"
-                      required
-                    />
+                <form onSubmit={handleSubmit} className="space-y-6 py-4">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="name" className="text-sm font-semibold">Policy Name *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => {
+                          setFormData({...formData, name: e.target.value})
+                          if (formErrors.name) setFormErrors(prev => ({ ...prev, name: '' }))
+                        }}
+                        placeholder="e.g., Standard Annual Leave Policy"
+                        required
+                        className={`h-10 ${formErrors.name ? 'border-red-500' : ''}`}
+                      />
+                      {formErrors.name && (
+                        <p className="text-sm text-red-600">{formErrors.name}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="text-sm font-semibold">Leave Type *</Label>
+                      <Select
+                        value={formData.leave_type && formData.leave_type !== 0 ? formData.leave_type.toString() : undefined}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, leave_type: parseInt(value) }))}
+                        disabled={availableLeaveTypes.length === 0}
+                      >
+                        <SelectTrigger className={`!h-10 w-full ${availableLeaveTypes.length === 0 ? "opacity-50" : ""}`}>
+                          {formData.leave_type && formData.leave_type !== 0 ? (
+                            <SelectValue />
+                          ) : (
+                            <span className="text-muted-foreground">
+                              {availableLeaveTypes.length === 0
+                                ? "All leave types are already used in policies"
+                                : "Select leave type..."}
+                            </span>
+                          )}
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableLeaveTypes.length === 0 ? (
+                            <div className="px-2 py-3 text-sm text-gray-500 text-center">
+                              No leave types available for new policies
+                            </div>
+                          ) : (
+                            availableLeaveTypes.map((type) => (
+                              <SelectItem key={type.id} value={type.id.toString()}>
+                                {type.name} ({type.code})
+                                {editingId && formData.leave_type === type.id && (
+                                  <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                                    Current
+                                  </span>
+                                )}
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Leave Type *</Label>
-                    <Select
-                      value={formData.leave_type && formData.leave_type !== 0 ? formData.leave_type.toString() : undefined}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, leave_type: parseInt(value) }))}
-                      disabled={availableLeaveTypes.length === 0}
-                    >
-                      <SelectTrigger className={availableLeaveTypes.length === 0 ? "opacity-50" : ""}>
-                        {formData.leave_type && formData.leave_type !== 0 ? (
-                          <SelectValue />
-                        ) : (
-                          <span className="text-muted-foreground">
-                            {availableLeaveTypes.length === 0
-                              ? "All leave types are already used in policies"
-                              : "Select leave type..."}
-                          </span>
-                        )}
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableLeaveTypes.length === 0 ? (
-                          <div className="px-2 py-3 text-sm text-gray-500 text-center">
-                            No leave types available for new policies
-                          </div>
-                        ) : (
-                          availableLeaveTypes.map((type) => (
-                            <SelectItem key={type.id} value={type.id.toString()}>
-                              {type.name} ({type.code})
-                              {editingId && formData.leave_type === type.id && (
-                                <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                                  Current
-                                </span>
-                              )}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="annual_quota">Annual Quota</Label>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="annual_quota" className="text-sm font-semibold">Annual Quota (days)</Label>
                       <Input
                         id="annual_quota"
                         type="number"
                         min="0"
                         value={formData.annual_quota}
                         onChange={(e) => setFormData({...formData, annual_quota: parseInt(e.target.value) || 0})}
+                        className="h-10"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="monthly_accrual">Monthly Accrual</Label>
+                    <div className="space-y-3">
+                      <Label htmlFor="monthly_accrual" className="text-sm font-semibold">Monthly Accrual (days)</Label>
                       <Input
                         id="monthly_accrual"
                         value={formData.monthly_accrual}
                         onChange={(e) => setFormData({...formData, monthly_accrual: e.target.value})}
+                        className="h-10"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="carry_forward_limit">Carry Forward Limit</Label>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="carry_forward_limit" className="text-sm font-semibold">Carry Forward Limit (days)</Label>
                       <Input
                         id="carry_forward_limit"
                         type="number"
                         min="0"
                         value={formData.carry_forward_limit}
                         onChange={(e) => setFormData({...formData, carry_forward_limit: parseInt(e.target.value) || 0})}
+                        className="h-10"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="notice_days">Notice Days</Label>
+                    <div className="space-y-3">
+                      <Label htmlFor="notice_days" className="text-sm font-semibold">Notice Days Required</Label>
                       <Input
                         id="notice_days"
                         type="number"
                         min="0"
                         value={formData.notice_days}
                         onChange={(e) => setFormData({...formData, notice_days: parseInt(e.target.value) || 0})}
+                        className="h-10"
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="max_consecutive">Max Consecutive Days</Label>
-                    <Input
-                      id="max_consecutive"
-                      type="number"
-                      min="0"
-                      value={formData.max_consecutive}
-                      onChange={(e) => setFormData({...formData, max_consecutive: parseInt(e.target.value) || 0})}
-                    />
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <Label htmlFor="max_consecutive" className="text-sm font-semibold">Max Consecutive Days</Label>
+                      <Input
+                        id="max_consecutive"
+                        type="number"
+                        min="0"
+                        value={formData.max_consecutive}
+                        onChange={(e) => setFormData({...formData, max_consecutive: parseInt(e.target.value) || 0})}
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <Label className="text-sm font-semibold">Status</Label>
+                      <div className="flex items-center space-x-3 h-10">
+                        <Switch
+                          id="is_active"
+                          checked={formData.is_active}
+                          onCheckedChange={(checked) => setFormData({...formData, is_active: checked})}
+                        />
+                        <Label htmlFor="is_active" className="text-sm font-medium cursor-pointer">Active Policy</Label>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="is_active"
-                      checked={formData.is_active}
-                      onCheckedChange={(checked) => setFormData({...formData, is_active: checked})}
-                    />
-                    <Label htmlFor="is_active">Active Policy</Label>
-                  </div>
-
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <DialogFooter className="gap-3 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)} className="min-w-[100px]">
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={saving}>
+                    <Button type="submit" disabled={saving} className="min-w-[120px]">
                       {saving ? 'Saving...' : (editingId ? 'Update Policy' : 'Create Policy')}
                     </Button>
                   </DialogFooter>

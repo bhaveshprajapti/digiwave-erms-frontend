@@ -22,28 +22,30 @@ export function PolicyManagement() {
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="applications" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Applications
-          </TabsTrigger>
-          <TabsTrigger value="balances" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Balances
-          </TabsTrigger>
-          <TabsTrigger value="leave-types" className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Leave Types
-          </TabsTrigger>
-          <TabsTrigger value="flexible-timing" className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Flexible Timing
-          </TabsTrigger>
-          <TabsTrigger value="policies" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Leave Policies
-          </TabsTrigger>
-        </TabsList>
+        <div className="mb-6">
+          <TabsList className="inline-flex w-auto h-auto p-1 gap-1">
+            <TabsTrigger value="applications" className="flex items-center gap-2 px-3 py-2">
+              <FileText className="h-4 w-4" />
+              Applications
+            </TabsTrigger>
+            <TabsTrigger value="balances" className="flex items-center gap-2 px-3 py-2">
+              <Users className="h-4 w-4" />
+              Balances
+            </TabsTrigger>
+            <TabsTrigger value="leave-types" className="flex items-center gap-2 px-3 py-2">
+              <Calendar className="h-4 w-4" />
+              Leave Types
+            </TabsTrigger>
+            <TabsTrigger value="flexible-timing" className="flex items-center gap-2 px-3 py-2">
+              <Clock className="h-4 w-4" />
+              Flexible Timing
+            </TabsTrigger>
+            <TabsTrigger value="policies" className="flex items-center gap-2 px-3 py-2">
+              <Settings className="h-4 w-4" />
+              Leave Policies
+            </TabsTrigger>
+          </TabsList>
+        </div>
         
         <TabsContent value="applications" className="space-y-6">
           <LeaveApplicationsManager />

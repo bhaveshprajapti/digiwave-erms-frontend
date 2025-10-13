@@ -6,42 +6,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle,
-  DialogTrigger 
-} from "@/components/ui/dialog"
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table"
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu"
-import { 
-  Plus, 
-  MoreHorizontal, 
-  Edit, 
-  Trash2, 
-  Calendar, 
-  Settings, 
-  CheckCircle, 
-  XCircle 
-} from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
+import { Calendar, Plus, Settings } from "lucide-react"
+import { DataTable } from "@/components/common/data-table"
+import { ActionButtons } from "@/components/common/action-buttons"
 import { 
   getLeaveTypes, 
   createLeaveType, 
@@ -49,28 +20,13 @@ import {
   deleteLeaveType,
   getLeaveTypePolicies 
 } from "@/lib/api/leave-types"
-
-interface LeaveType {
-  id: number
-  name: string
-  code: string
-  is_paid: boolean
-  description?: string
-  color_code: string
-  icon?: string
-  is_active: boolean
-  created_at: string
-  updated_at: string
-  policies_count: number
-}
+import { LeaveType } from "@/lib/schemas"
 
 interface LeaveTypeFormData {
   name: string
   code: string
   is_paid: boolean
-  description: string
   color_code: string
-  icon: string
   is_active: boolean
 }
 
@@ -78,9 +34,7 @@ const defaultFormData: LeaveTypeFormData = {
   name: '',
   code: '',
   is_paid: true,
-  description: '',
   color_code: '#007bff',
-  icon: '',
   is_active: true
 }
 
@@ -93,6 +47,8 @@ export function LeaveTypesManager() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<number | null>(null)
+  const [updatingStatus, setUpdatingStatus] = useState<number | null>(null)
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
   const fetchLeaveTypes = async () => {
     try {
@@ -116,6 +72,7 @@ export function LeaveTypesManager() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setFormErrors({}) // Clear previous errors
     
     if (!formData.name.trim() || !formData.code.trim()) {
       toast({
@@ -148,11 +105,37 @@ export function LeaveTypesManager() {
       fetchLeaveTypes()
       
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error?.response?.data?.message || "Failed to save leave type",
-        variant: "destructive"
-      })
+      const errorData = error?.response?.data
+      
+      // Handle field-specific validation errors
+      if (errorData && typeof errorData === 'object') {
+        const errors: Record<string, string> = {}
+        
+        Object.keys(errorData).forEach(key => {
+          if (Array.isArray(errorData[key])) {
+            errors[key] = errorData[key][0]
+          } else if (typeof errorData[key] === 'string') {
+            errors[key] = errorData[key]
+          }
+        })
+        
+        setFormErrors(errors)
+        
+        // Show toast for general errors
+        if (errorData.detail || errorData.message) {
+          toast({
+            title: "Error",
+            description: errorData.detail || errorData.message,
+            variant: "destructive"
+          })
+        }
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to save leave type",
+          variant: "destructive"
+        })
+      }
     } finally {
       setSaving(false)
     }
@@ -163,9 +146,7 @@ export function LeaveTypesManager() {
       name: leaveType.name,
       code: leaveType.code,
       is_paid: leaveType.is_paid,
-      description: leaveType.description || '',
       color_code: leaveType.color_code,
-      icon: leaveType.icon || '',
       is_active: leaveType.is_active
     })
     setEditingId(leaveType.id)
@@ -199,7 +180,99 @@ export function LeaveTypesManager() {
   const resetForm = () => {
     setFormData(defaultFormData)
     setEditingId(null)
+    setFormErrors({})
   }
+
+  const handleStatusToggle = async (leaveType: LeaveType) => {
+    setUpdatingStatus(leaveType.id)
+    try {
+      await updateLeaveType(leaveType.id, { is_active: !leaveType.is_active })
+      toast({
+        title: "Success",
+        description: `Leave type ${!leaveType.is_active ? 'activated' : 'deactivated'} successfully`
+      })
+      fetchLeaveTypes()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.response?.data?.message || "Failed to update status",
+        variant: "destructive"
+      })
+    } finally {
+      setUpdatingStatus(null)
+    }
+  }
+
+  const columns = [
+    {
+      key: 'name',
+      header: 'Name',
+      sortable: true,
+      cell: (leaveType: LeaveType) => (
+        <div className="font-medium">{leaveType.name}</div>
+      )
+    },
+    {
+      key: 'code',
+      header: 'Code',
+      sortable: true,
+      cell: (leaveType: LeaveType) => (
+        <Badge variant="outline">{leaveType.code}</Badge>
+      )
+    },
+    {
+      key: 'is_paid',
+      header: 'Type',
+      sortable: true,
+      cell: (leaveType: LeaveType) => (
+        <Badge variant={leaveType.is_paid ? "default" : "secondary"}>
+          {leaveType.is_paid ? "Paid" : "Unpaid"}
+        </Badge>
+      )
+    },
+    {
+      key: 'policies_count',
+      header: 'Policies',
+      sortable: true,
+      cell: (leaveType: LeaveType) => `${leaveType.policies_count} policies`
+    },
+    {
+      key: 'is_active',
+      header: 'Status',
+      sortable: true,
+      cell: (leaveType: LeaveType) => (
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={leaveType.is_active}
+            onCheckedChange={() => handleStatusToggle(leaveType)}
+            disabled={updatingStatus === leaveType.id}
+          />
+          <span className={`text-sm font-medium ${leaveType.is_active ? 'text-green-600' : 'text-gray-500'}`}>
+            {leaveType.is_active ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+      )
+    },
+    {
+      key: 'created_at',
+      header: 'Created',
+      sortable: true,
+      cell: (leaveType: LeaveType) => new Date(leaveType.created_at).toLocaleDateString()
+    },
+    {
+      key: 'actions',
+      header: <span className="block text-center">Actions</span>,
+      cell: (leaveType: LeaveType) => (
+        <div className="flex items-center justify-center">
+          <ActionButtons
+            onEdit={() => handleEdit(leaveType)}
+            onDelete={() => handleDelete(leaveType.id)}
+            disabled={deleting === leaveType.id}
+          />
+        </div>
+      )
+    }
+  ]
 
   return (
     <Card>
@@ -210,9 +283,6 @@ export function LeaveTypesManager() {
               <Calendar className="h-5 w-5" />
               Leave Types Management
             </CardTitle>
-            <p className="text-muted-foreground">
-              Manage different types of leave available in your organization
-            </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -221,112 +291,87 @@ export function LeaveTypesManager() {
                 Add Leave Type
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>
+            <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader className="pb-4">
+                <DialogTitle className="text-xl">
                   {editingId ? 'Edit Leave Type' : 'Create Leave Type'}
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-sm">
                   {editingId 
                     ? 'Update the leave type information below'
                     : 'Create a new leave type for your organization'
                   }
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Name *</Label>
+              <form onSubmit={handleSubmit} className="space-y-6 py-4">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label htmlFor="name" className="text-sm font-semibold">Name *</Label>
                     <Input
                       id="name"
                       value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
-                      placeholder="Annual Leave"
+                      onChange={(e) => {
+                        setFormData({...formData, name: e.target.value})
+                        if (formErrors.name) setFormErrors(prev => ({ ...prev, name: '' }))
+                      }}
+                      placeholder="e.g., Annual Leave"
                       required
+                      className={`h-10 ${formErrors.name ? 'border-red-500' : ''}`}
                     />
+                    {formErrors.name && (
+                      <p className="text-sm text-red-600">{formErrors.name}</p>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="code">Code *</Label>
+                  <div className="space-y-3">
+                    <Label htmlFor="code" className="text-sm font-semibold">Code *</Label>
                     <Input
                       id="code"
                       value={formData.code}
-                      onChange={(e) => setFormData({...formData, code: e.target.value.toUpperCase()})}
-                      placeholder="AL"
+                      onChange={(e) => {
+                        setFormData({...formData, code: e.target.value.toUpperCase()})
+                        if (formErrors.code) setFormErrors(prev => ({ ...prev, code: '' }))
+                      }}
+                      placeholder="e.g., AL"
                       required
                       maxLength={10}
+                      className={`h-10 ${formErrors.code ? 'border-red-500' : ''}`}
                     />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="color">Color</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="color"
-                        type="color"
-                        value={formData.color_code}
-                        onChange={(e) => setFormData({...formData, color_code: e.target.value})}
-                        className="w-16 h-10"
-                      />
-                      <Input
-                        value={formData.color_code}
-                        onChange={(e) => setFormData({...formData, color_code: e.target.value})}
-                        placeholder="#007bff"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="icon">Icon (optional)</Label>
-                    <Input
-                      id="icon"
-                      value={formData.icon}
-                      onChange={(e) => setFormData({...formData, icon: e.target.value})}
-                      placeholder="calendar-days"
-                    />
+                    {formErrors.code && (
+                      <p className="text-sm text-red-600">{formErrors.code}</p>
+                    )}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({...formData, description: e.target.value})}
-                    placeholder="Describe this leave type..."
-                    rows={3}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
+                <div className="flex items-center justify-between pt-2 pb-2 border-t border-b">
+                  <div className="flex items-center space-x-3">
                     <Switch
                       id="is_paid"
                       checked={formData.is_paid}
                       onCheckedChange={(checked) => setFormData({...formData, is_paid: checked})}
                     />
-                    <Label htmlFor="is_paid">Paid Leave</Label>
+                    <Label htmlFor="is_paid" className="text-sm font-medium cursor-pointer">Paid Leave</Label>
                   </div>
                   
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-3">
                     <Switch
                       id="is_active"
                       checked={formData.is_active}
                       onCheckedChange={(checked) => setFormData({...formData, is_active: checked})}
                     />
-                    <Label htmlFor="is_active">Active</Label>
+                    <Label htmlFor="is_active" className="text-sm font-medium cursor-pointer">Active</Label>
                   </div>
                 </div>
 
-                <DialogFooter>
+                <DialogFooter className="gap-2 pt-4">
                   <Button 
                     type="button" 
                     variant="outline" 
                     onClick={() => setDialogOpen(false)}
+                    className="min-w-[100px]"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={saving}>
+                  <Button type="submit" disabled={saving} className="min-w-[100px]">
                     {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
                   </Button>
                 </DialogFooter>
@@ -336,118 +381,12 @@ export function LeaveTypesManager() {
         </div>
       </CardHeader>
       <CardContent>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse bg-muted h-16 rounded"></div>
-            ))}
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Code</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Policies</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {leaveTypes.map((leaveType) => (
-                <TableRow key={leaveType.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-4 h-4 rounded-full" 
-                        style={{ backgroundColor: leaveType.color_code }}
-                      />
-                      <div>
-                        <div className="font-medium">{leaveType.name}</div>
-                        {leaveType.description && (
-                          <div className="text-sm text-muted-foreground">
-                            {leaveType.description}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{leaveType.code}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={leaveType.is_paid ? "default" : "secondary"}>
-                      {leaveType.is_paid ? "Paid" : "Unpaid"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">{leaveType.policies_count} policies</span>
-                  </TableCell>
-                  <TableCell>
-                    {leaveType.is_active ? (
-                      <Badge variant="outline" className="text-green-600 border-green-200">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Active
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-red-600 border-red-200">
-                        <XCircle className="w-3 h-3 mr-1" />
-                        Inactive
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(leaveType.created_at).toLocaleDateString()}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(leaveType)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <a href={`/dashboard/leave/policies?leave_type=${leaveType.id}`}>
-                            <Settings className="h-4 w-4 mr-2" />
-                            Manage Policies
-                          </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => handleDelete(leaveType.id)}
-                          className="text-red-600"
-                          disabled={deleting === leaveType.id}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {deleting === leaveType.id ? 'Deleting...' : 'Delete'}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {leaveTypes.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    <div className="text-muted-foreground">
-                      <Calendar className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                      <p className="text-lg font-medium mb-2">No Leave Types Found</p>
-                      <p className="text-sm">Create your first leave type to get started.</p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        )}
+        <DataTable
+          columns={columns}
+          data={leaveTypes}
+          loading={loading}
+          getRowKey={(leaveType) => leaveType.id.toString()}
+        />
       </CardContent>
     </Card>
   )

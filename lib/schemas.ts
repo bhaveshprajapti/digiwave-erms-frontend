@@ -112,8 +112,11 @@ export interface LeaveType {
   code: string
   is_paid: boolean
   description?: string | null
+  color_code: string
   is_active: boolean
-  created_at?: string
+  created_at: string
+  updated_at: string
+  policies_count: number
 }
 
 export interface LeavePolicy {
