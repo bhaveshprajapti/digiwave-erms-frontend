@@ -53,25 +53,46 @@ export default function AdminAttendancePage() {
       setRows(data.results)
       setTotalCount(data.count)
       
-      // Calculate stats
-      const uniqueEmployees = new Set(data.results.map((r: any) => r.user)).size
+      // Fetch ALL records for stats calculation (without pagination)
+      const statsParams: any = {}
+      if (filterUser) statsParams.user = Number(filterUser)
+      if (filterStart) statsParams.start_date = filterStart.toISOString().slice(0,10)
+      if (filterEnd) statsParams.end_date = filterEnd.toISOString().slice(0,10)
+      statsParams.page_size = 10000 // Get all records for stats
+      const allData = await listAttendances(statsParams)
+      
+      // Calculate stats from all records
+      const uniqueEmployees = new Set(allData.results.map((r: any) => r.user)).size
       const today = new Date().toISOString().split('T')[0]
-      const todayRecords = data.results.filter((r: any) => r.date === today)
-      const totalHours = data.results.reduce((sum: number, r: any) => {
+      const todayRecords = allData.results.filter((r: any) => r.date === today)
+      
+      // Calculate total seconds instead of hours
+      const totalSeconds = allData.results.reduce((sum: number, r: any) => {
         if (r.total_hours) {
-          const match = r.total_hours.match(/^(\d{1,2}):(\d{2}):(\d{2})$/)
+          // Match HH:MM:SS or HH:MM:SS.microseconds format
+          const match = r.total_hours.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:\.\d+)?$/)
           if (match) {
-            return sum + (parseInt(match[1]) + parseInt(match[2])/60 + parseInt(match[3])/3600)
+            return sum + (parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]))
           }
         }
         return sum
       }, 0)
       
+      // Convert seconds to HH:MM:SS format
+      const formatTime = (seconds: number) => {
+        const h = Math.floor(seconds / 3600)
+        const m = Math.floor((seconds % 3600) / 60)
+        const s = seconds % 60
+        return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+      }
+      
+      const avgSeconds = uniqueEmployees > 0 ? Math.floor(totalSeconds / uniqueEmployees) : 0
+      
       setStats({
         totalEmployees: uniqueEmployees,
         presentToday: todayRecords.length,
-        totalHours: Math.round(totalHours),
-        avgHours: uniqueEmployees > 0 ? Math.round(totalHours / uniqueEmployees * 10) / 10 : 0
+        totalHours: totalSeconds,
+        avgHours: avgSeconds
       })
     } finally { setLoading(false) }
   }
@@ -83,13 +104,21 @@ export default function AdminAttendancePage() {
     load()
   }, [filterUser, filterStart, filterEnd, page, pageSize])
 
-  const openSessionModal = (employeeId: number, employeeName: string) => {
+  const openSessionModal = (employeeId: number, employeeName: string, date: string) => {
     setSessionModal({ 
       isOpen: true, 
       employeeId, 
       employeeName, 
-      selectedDate: new Date().toISOString().split('T')[0] 
+      selectedDate: date 
     })
+  }
+
+  // Format seconds to HH:MM:SS
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
   return (
@@ -134,7 +163,7 @@ export default function AdminAttendancePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Total Hours</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.totalHours}h</p>
+                <p className="text-2xl font-bold text-purple-600 font-mono">{formatTime(stats.totalHours)}</p>
               </div>
               <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <Clock className="h-6 w-6 text-purple-600" />
@@ -148,7 +177,7 @@ export default function AdminAttendancePage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Avg Hours/Employee</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.avgHours}h</p>
+                <p className="text-2xl font-bold text-orange-600 font-mono">{formatTime(stats.avgHours)}</p>
               </div>
               <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
                 <AlertTriangle className="h-6 w-6 text-orange-600" />
@@ -203,8 +232,8 @@ export default function AdminAttendancePage() {
                 const userName = userOptions.find(u => Number(u.value)===Number(r.user))?.label || `User ${r.user}`
                 return (
                   <button 
-                    className="text-left hover:text-primary hover:underline font-medium"
-                    onClick={() => openSessionModal(r.user, userName)}
+                    className="text-left hover:text-blue-600 hover:underline font-medium cursor-pointer transition-colors"
+                    onClick={() => openSessionModal(r.user, userName, r.date)}
                   >
                     {userName}
                   </button>

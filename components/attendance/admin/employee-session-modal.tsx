@@ -12,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
-import { DatePicker } from "@/components/ui/date-picker"
 import { Clock, Coffee, Play, Pause, User, Calendar } from "lucide-react"
 import api from "@/lib/api"
 
@@ -166,78 +165,53 @@ export function EmployeeSessionModal({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Date Selection */}
-        <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            <span className="text-sm font-medium">Select Date:</span>
-          </div>
-          <DatePicker
-            value={new Date(selectedDate)}
-            onChange={(date: Date | undefined) => {
-              if (date) {
-                onDateChange(date.toISOString().split('T')[0])
-              }
-            }}
-          />
-        </div>
-
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Summary Cards */}
+            {/* Summary Cards - Same style as attendance page */}
             <div className="grid gap-4 md:grid-cols-3">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                    Total Work Time
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-blue-600">
-                    {formatDuration(totalWorkTime)}
+              <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-card to-muted/20">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Work Time</p>
+                      <p className="text-2xl font-bold text-blue-600">{formatDuration(totalWorkTime)}</p>
+                    </div>
+                    <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Clock className="h-6 w-6 text-blue-600" />
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Total work duration
-                  </p>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Coffee className="h-4 w-4 text-orange-600" />
-                    Total Break Time
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-orange-600">
-                    {formatDuration(totalBreakTime)}
+              <Card className="border-l-4 border-l-orange-500 bg-gradient-to-br from-card to-muted/20">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Break Time</p>
+                      <p className="text-2xl font-bold text-orange-600">{formatDuration(totalBreakTime)}</p>
+                    </div>
+                    <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <Coffee className="h-6 w-6 text-orange-600" />
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Total break duration
-                  </p>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-green-600" />
-                    Total Time
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">
-                    {formatDuration(totalWorkTime + totalBreakTime)}
+              <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-card to-muted/20">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Time</p>
+                      <p className="text-2xl font-bold text-green-600">{formatDuration(totalWorkTime + totalBreakTime)}</p>
+                    </div>
+                    <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+                      <Clock className="h-6 w-6 text-green-600" />
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Combined duration
-                  </p>
                 </CardContent>
               </Card>
             </div>

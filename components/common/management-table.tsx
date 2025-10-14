@@ -303,7 +303,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
       case "select":
         return (
           <Select value={String(value ?? '')} onValueChange={(v) => onChange(isNaN(Number(v)) ? v : Number(v))}>
-            <SelectTrigger id={String(field.key)}>
+            <SelectTrigger id={String(field.key)} className="!h-10 !w-full">
               <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
             </SelectTrigger>
             <SelectContent>
@@ -320,6 +320,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
             id={String(field.key)}
             value={value ?? ""}
             onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+            className="!h-10 !w-full"
           />
         )
       case "time":
@@ -328,6 +329,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
             value={value as string}
             onChange={(t: string) => onChange(t)}
             withSeconds
+            className="!h-10 !w-full"
           />
         )
       case "date":
@@ -336,6 +338,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
             value={toDateObj(value as string)}
             onChange={(d) => onChange(toYMD(d))}
             placeholder="YYYY-MM-DD"
+            className="!h-10 !w-full"
           />
         )
       default:
@@ -345,6 +348,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
             id={String(field.key)}
             value={value ?? ""}
             onChange={(e) => onChange(e.target.value)}
+            className="!h-10 !w-full"
           />
         )
     }

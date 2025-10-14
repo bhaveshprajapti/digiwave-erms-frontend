@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast"
 import { deleteEmployee } from "@/hooks/use-employees"
 import { EmployeeModal } from "./employee-modal"
+import { EmployeeDetailsModal } from "./employee-details-modal"
 import api from "@/lib/api"
 
 import { useEmployees } from "@/hooks/use-employees"
@@ -57,6 +58,8 @@ export function EmployeeList() {
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeListItem | null>(null)
   const [employeeToDelete, setEmployeeToDelete] = useState<EmployeeListItem | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false)
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
   const { employees, isLoading, error, mutate } = useEmployees()
   const { employeeTypes, isLoading: loadingTypes } = useEmployeeTypes()
   const { designations, isLoading: loadingDesignations } = useDesignations()
@@ -211,7 +214,15 @@ export function EmployeeList() {
             columns={[
               { key: 'sr', header: 'Sr No.', cell: (_e, i) => <span className="font-medium">{i + 1}</span>, className: 'w-16' },
               { key: 'username', header: 'Username', cell: (e) => (
-                <a href={`/dashboard/employees/${e.id}`} className="text-primary hover:text-primary/80 font-medium hover:underline">{e.username}</a>
+                <button 
+                  onClick={() => {
+                    setSelectedEmployeeId(e.id)
+                    setDetailsModalOpen(true)
+                  }}
+                  className="text-primary hover:text-primary/80 font-medium hover:underline cursor-pointer"
+                >
+                  {e.username}
+                </button>
               )},
               { key: 'full_name', header: 'Full Name', cell: (e) => (
                 <span className="font-medium">{e.first_name} {e.last_name}</span>
@@ -272,6 +283,15 @@ export function EmployeeList() {
         employee={selectedEmployee}
         mode={modalMode}
         onSuccess={handleRefresh}
+      />
+
+      <EmployeeDetailsModal
+        employeeId={selectedEmployeeId}
+        isOpen={detailsModalOpen}
+        onClose={() => {
+          setDetailsModalOpen(false)
+          setSelectedEmployeeId(null)
+        }}
       />
 
       <AlertDialog open={!!employeeToDelete} onOpenChange={(open) => !open && setEmployeeToDelete(null)}>
