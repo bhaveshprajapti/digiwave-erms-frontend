@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DatePicker } from "@/components/ui/date-picker"
 import { MultiSelect } from "@/components/ui/multi-select"
+import { Eye, EyeOff } from "lucide-react"
 
 
 interface EmployeeFormData {
@@ -114,6 +115,8 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [selectedTechnologies, setSelectedTechnologies] = useState<string[]>([])
   const [sameAsCurrent, setSameAsCurrent] = useState<boolean>(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({})
 
   // Function to fetch address text from address ID
   const fetchAddressText = async (addressId: number): Promise<string> => {
@@ -127,6 +130,13 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
     }
     return ''
   }
+
+  // Clear field errors when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setFieldErrors({})
+    }
+  }, [isOpen])
 
   useEffect(() => {
     const loadEmployeeData = async () => {
@@ -242,7 +252,15 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
 
   const handleChange = useCallback((field: keyof EmployeeFormData, value: string | number[] | boolean | File | null) => {
     setFormData(prev => ({ ...prev, [field]: value }))
-  }, [])
+    // Clear field error when user starts typing
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      })
+    }
+  }, [fieldErrors])
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -262,6 +280,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
       
       if (formData.password) {
         formDataToSend.append('password', formData.password)
+        formDataToSend.append('plain_password', formData.password) // Store for admin viewing
       }
       
       if (formData.employee_type && formData.employee_type !== '0') {
@@ -355,15 +374,64 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
         })
       }
 
+      // Clear any existing field errors on successful submission
+      setFieldErrors({})
       onClose()
       onSuccess?.()
     } catch (error: any) {
       console.error('Error saving employee:', error)
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.response?.data?.message || "Failed to save employee",
-      })
+      
+      // Parse validation errors from Django backend
+      let errorMessage = "Failed to save employee"
+      const errors: {[key: string]: string} = {}
+      
+      if (error.response?.data) {
+        const errorData = error.response.data
+        console.log('Backend error data:', errorData)
+        
+        // Check if it's a validation error with field-specific messages
+        if (typeof errorData === 'object' && !errorData.message) {
+          // Handle Django field validation errors
+          for (const [field, messages] of Object.entries(errorData)) {
+            if (Array.isArray(messages)) {
+              errors[field] = messages.join(', ')
+            } else if (typeof messages === 'string') {
+              errors[field] = messages
+            }
+          }
+          
+          // Set field errors for display below inputs
+          setFieldErrors(errors)
+          
+          // If there are field errors, show a generic toast
+          if (Object.keys(errors).length > 0) {
+            errorMessage = "Please fix the validation errors below"
+          }
+        } else if (errorData.message) {
+          // Handle custom error messages
+          errorMessage = errorData.message
+        } else if (errorData.detail) {
+          // Handle DRF detail messages
+          errorMessage = errorData.detail
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData
+        }
+      }
+      
+      // Only show toast for non-field errors or when there are no field errors
+      if (Object.keys(errors).length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: errorMessage,
+        })
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: errorMessage,
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -434,52 +502,85 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                     <tr>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">First Name</th>
                       <td className="p-2 border">
-                        <Input
-                          id="first_name"
-                          placeholder="Enter first name"
-                          required
-                          className="h-9"
-                          value={formData.first_name}
-                          onChange={(e) => handleChange("first_name", e.target.value)}
-                        />
+                        <div>
+                          <Input
+                            id="first_name"
+                            placeholder="Enter first name"
+                            required
+                            className={`h-9 ${fieldErrors.first_name ? 'border-red-500 focus:border-red-500' : ''}`}
+                            value={formData.first_name}
+                            onChange={(e) => handleChange("first_name", e.target.value)}
+                          />
+                          {fieldErrors.first_name && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.first_name}</p>
+                          )}
+                        </div>
                       </td>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Last Name</th>
                       <td className="p-2 border">
-                        <Input
-                          id="last_name"
-                          placeholder="Enter last name"
-                          required
-                          className="h-9"
-                          value={formData.last_name}
-                          onChange={(e) => handleChange("last_name", e.target.value)}
-                        />
+                        <div>
+                          <Input
+                            id="last_name"
+                            placeholder="Enter last name"
+                            required
+                            className={`h-9 ${fieldErrors.last_name ? 'border-red-500 focus:border-red-500' : ''}`}
+                            value={formData.last_name}
+                            onChange={(e) => handleChange("last_name", e.target.value)}
+                          />
+                          {fieldErrors.last_name && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.last_name}</p>
+                          )}
+                        </div>
                       </td>
                     </tr>
 
                     <tr>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Username</th>
                       <td className="p-2 border">
-                        <Input
-                          id="username"
-                          placeholder="Choose a username"
-                          required
-                          className="h-9"
-                          value={formData.username}
-                          onChange={(e) => handleChange("username", e.target.value)}
-                        />
+                        <div>
+                          <Input
+                            id="username"
+                            placeholder="Choose a username"
+                            required
+                            className={`h-9 ${fieldErrors.username ? 'border-red-500 focus:border-red-500' : ''}`}
+                            value={formData.username}
+                            onChange={(e) => handleChange("username", e.target.value)}
+                          />
+                          {fieldErrors.username && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.username}</p>
+                          )}
+                        </div>
                       </td>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Password</th>
                       <td className="p-2 border">
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder={mode === 'add' ? "Enter password" : "Leave blank to keep current password"}
-                          required={mode === 'add'}
-                          className="h-9"
-                          value={formData.password}
-                          onChange={(e) => handleChange("password", e.target.value)}
-                        />
-                        {mode === 'edit' && (
+                        <div className="relative">
+                          <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            placeholder={mode === 'add' ? "Enter password" : "Leave blank to keep current password"}
+                            required={mode === 'add'}
+                            className={`h-9 pr-10 ${fieldErrors.password ? 'border-red-500 focus:border-red-500' : ''}`}
+                            value={formData.password}
+                            onChange={(e) => handleChange("password", e.target.value)}
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-gray-500" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-gray-500" />
+                            )}
+                          </Button>
+                        </div>
+                        {fieldErrors.password && (
+                          <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+                        )}
+                        {mode === 'edit' && !fieldErrors.password && (
                           <p className="text-xs text-gray-500 mt-1">
                             Leave blank to keep the current password unchanged
                           </p>
@@ -489,26 +590,36 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                     <tr>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Email</th>
                       <td className="p-2 border">
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="Enter email address"
-                          required
-                          className="h-9"
-                          value={formData.email}
-                          onChange={(e) => handleChange("email", e.target.value)}
-                        />
+                        <div>
+                          <Input
+                            id="email"
+                            type="email"
+                            placeholder="Enter email address"
+                            required
+                            className={`h-9 ${fieldErrors.email ? 'border-red-500 focus:border-red-500' : ''}`}
+                            value={formData.email}
+                            onChange={(e) => handleChange("email", e.target.value)}
+                          />
+                          {fieldErrors.email && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>
+                          )}
+                        </div>
                       </td>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Phone</th>
                       <td className="p-2 border">
-                        <Input
-                          id="phone"
-                          type="tel"
-                          placeholder="Enter phone number"
-                          className="h-9"
-                          value={formData.phone}
-                          onChange={(e) => handleChange("phone", e.target.value)}
-                        />
+                        <div>
+                          <Input
+                            id="phone"
+                            type="tel"
+                            placeholder="Enter phone number"
+                            className={`h-9 ${fieldErrors.phone ? 'border-red-500 focus:border-red-500' : ''}`}
+                            value={formData.phone}
+                            onChange={(e) => handleChange("phone", e.target.value)}
+                          />
+                          {fieldErrors.phone && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.phone}</p>
+                          )}
+                        </div>
                       </td>
                     </tr>
 
@@ -713,15 +824,20 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                     <tr>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Salary</th>
                       <td className="p-2 border">
-                        <Input
-                          id="salary"
-                          type="number"
-                          placeholder="Enter salary"
-                          required
-                          className="h-9"
-                          value={formData.salary}
-                          onChange={(e) => handleChange("salary", e.target.value)}
-                        />
+                        <div>
+                          <Input
+                            id="salary"
+                            type="number"
+                            placeholder="Enter salary"
+                            required
+                            className={`h-9 ${fieldErrors.salary ? 'border-red-500 focus:border-red-500' : ''}`}
+                            value={formData.salary}
+                            onChange={(e) => handleChange("salary", e.target.value)}
+                          />
+                          {fieldErrors.salary && (
+                            <p className="mt-1 text-xs text-red-600">{fieldErrors.salary}</p>
+                          )}
+                        </div>
                       </td>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Joining Date</th>
                       <td className="p-2 border">

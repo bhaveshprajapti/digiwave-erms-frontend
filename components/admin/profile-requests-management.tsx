@@ -197,7 +197,6 @@ export function ProfileRequestsManagement() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Profile Update Requests</h1>
-          <p className="text-gray-600">Review and approve employee profile update requests</p>
         </div>
         <div className="flex items-center space-x-2">
           <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">

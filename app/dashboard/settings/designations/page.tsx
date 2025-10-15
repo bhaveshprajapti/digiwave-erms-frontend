@@ -28,8 +28,8 @@ export default function DesignationsPage() {
     <Card>
       <CardContent>
         <ManagementTable<Designation>
-          title="Designation"
-          description="Manage employee designations"
+          title="Designations"
+          description=""
           items={(designations || []) as any}
           isLoading={isLoading}
           labelKey={'title'}

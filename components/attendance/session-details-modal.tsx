@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Clock, MapPin, Timer, Coffee, Calendar, Users } from "lucide-react"
@@ -128,6 +128,9 @@ export function SessionDetailsModal({ isOpen, onClose, selectedDate, userId }: S
               </span>
             )}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Attendance session details for {selectedDate ? new Date(selectedDate).toLocaleDateString() : 'selected date'}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

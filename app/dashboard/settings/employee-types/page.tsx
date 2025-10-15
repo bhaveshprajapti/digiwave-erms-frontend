@@ -74,7 +74,7 @@ export default function EmployeeTypesPage() {
       <CardContent className="pt-6">
         <ManagementTable<EmployeeType>
           title="Employee Types"
-          description="Manage employee types like Full-time, Part-time, Contract, etc."
+          description=""
           items={employeeTypes ?? []}
           isLoading={isLoading}
           fields={[

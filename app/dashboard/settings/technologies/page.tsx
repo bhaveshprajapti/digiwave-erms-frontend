@@ -11,8 +11,8 @@ export default function TechnologiesPage() {
     <Card>
       <CardContent>
         <ManagementTable<any>
-          title="Technology"
-          description="Manage the technologies and skills used in your organization"
+          title="Technologies"
+          description=""
           items={(technologies || []) as any}
           isLoading={isLoading}
           fields={[

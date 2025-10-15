@@ -33,6 +33,17 @@ import { CheckCircle, MessageSquare, Search, XCircle } from "lucide-react"
 import Swal from 'sweetalert2'
 import { useAdminLeaveRequests } from "@/contexts/leave-requests-context"
 
+// Extended type for applications with runtime-added properties
+interface ExtendedApplication extends Omit<Partial<LeaveRequest>, 'status'> {
+  unique_key: string
+  request_type: string
+  duration_display: string
+  leave_type_name?: string
+  employee_name?: string
+  status?: number | string | null // Override to handle both LeaveRequest (number) and FlexibleTimingRequest (string)
+  [key: string]: any // Allow other dynamic properties
+}
+
 interface LeaveApplicationsManagerProps {
   className?: string
 }
@@ -96,15 +107,15 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
   }, [])
 
   // Combine all applications
-  const allApplications = useMemo(() => {
-    const typedLeaveApps = leaveApplications.map((app: any) => ({
+  const allApplications = useMemo<ExtendedApplication[]>(() => {
+    const typedLeaveApps: ExtendedApplication[] = leaveApplications.map((app: any) => ({
       ...app,
       unique_key: `leave-${app.id}`, // Add unique key for React
       request_type: app.is_half_day ? 'half-day' : 'full-day',
       duration_display: app.is_half_day ? '0.5 days' : `${app.total_days} days`
     }))
     
-    const typedFlexibleApps = flexibleTimingRequests.map((req: any) => ({
+    const typedFlexibleApps: ExtendedApplication[] = flexibleTimingRequests.map((req: any) => ({
       ...req,
       unique_key: `flexible-${req.id}`, // Add unique key for React
     }))
@@ -132,17 +143,17 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
   }, [statusChoices])
 
   // Filter applications
-  const filteredApplications = useMemo(() => {
-    return allApplications.filter((app: any) => {
+  const filteredApplications = useMemo<ExtendedApplication[]>(() => {
+    return allApplications.filter((app: ExtendedApplication) => {
       // Handle both leave requests and flexible timing requests
       const user = app.request_type === 'flexible-timing' ? 
         { first_name: app.employee_name?.split(' ')[0] || '', last_name: app.employee_name?.split(' ')[1] || '' } :
-        userMap[app.user]
+        (app.user ? userMap[app.user] : null)
       
       const userName = user ? `${user.first_name} ${user.last_name}`.toLowerCase() : ""
       const leaveTypeName = app.request_type === 'flexible-timing' ? 
         app.leave_type_name?.toLowerCase() || '' :
-        leaveTypeMap[app.leave_type]?.toLowerCase() || ""
+        (app.leave_type ? leaveTypeMap[app.leave_type]?.toLowerCase() || "" : "")
       
       const matchesSearch = searchTerm === "" || 
         userName.includes(searchTerm.toLowerCase()) ||
@@ -154,13 +165,13 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
       
       const status = app.status
       const matchesStatus = statusFilter === "all" || 
-        (statusFilter === "pending" && (!status || status === 1 || status === 'pending')) ||
-        (statusFilter === "approved" && (status === 2 || status === 'approved')) ||
-        (statusFilter === "rejected" && (status === 3 || status === 'rejected')) ||
-        (statusFilter === "cancelled" && (status === 4 || status === 'cancelled'))
+        (statusFilter === "pending" && (!status || status === 1 || status === "pending")) ||
+        (statusFilter === "approved" && (status === 2 || status === "approved")) ||
+        (statusFilter === "rejected" && (status === 3 || status === "rejected")) ||
+        (statusFilter === "cancelled" && (status === 4 || status === "cancelled"))
       
       const matchesLeaveType = leaveTypeFilter === "all" || 
-        app.leave_type.toString() === leaveTypeFilter
+        (app.leave_type ? app.leave_type.toString() === leaveTypeFilter : false)
       
       return matchesSearch && matchesStatus && matchesLeaveType && matchesRequestType
     })
@@ -503,7 +514,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
   }, [])
 
   // Helper function to check if application is pending
-  const isPendingApplication = (app: LeaveRequest) => {
+  const isPendingApplication = (app: LeaveRequest | any) => {
     // Handle both string and number status formats
     if (typeof app.status === 'string') {
       return app.status.toLowerCase() === 'pending' || !app.status
@@ -589,7 +600,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     {
       key: 'status',
       header: 'Status',
-      cell: (app: LeaveRequest) => getStatusBadge(app.status)
+      cell: (app: ExtendedApplication) => getStatusBadge(app.status)
     },
     {
       key: 'actions',
@@ -652,12 +663,6 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
   return (
     <div className={className}>
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Leave Applications Management
-          </CardTitle>
-        </CardHeader>
         <CardContent className="space-y-4">
           {/* Filters */}
           <div className="flex flex-wrap gap-4">

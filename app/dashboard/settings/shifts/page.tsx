@@ -33,7 +33,7 @@ export default function ShiftsPage() {
       <CardContent>
         <ManagementTable<Shift>
           title="Shifts"
-          description="Manage work shifts in the system"
+          description=""
           items={shifts || []}
           isLoading={isLoading}
           fields={[

@@ -125,7 +125,6 @@ export default function AdminAttendancePage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">Attendance Management</h2>
-        <p className="text-muted-foreground">Monitor and analyze employee attendance patterns</p>
       </div>
       
       {/* Stats Cards */}
@@ -189,9 +188,6 @@ export default function AdminAttendancePage() {
       
       {/* Detailed Attendance Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>Employee Attendance Records</CardTitle>
-        </CardHeader>
         <CardContent>
           <ManagementTable<AttendanceDTO>
             title=""

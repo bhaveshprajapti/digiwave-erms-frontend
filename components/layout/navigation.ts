@@ -51,7 +51,7 @@ export const navigationSections = [
           { href: "/dashboard/settings/designations", label: "Designations" },
           { href: "/dashboard/settings/shifts", label: "Shifts" },
           { href: "/dashboard/settings/technologies", label: "Technologies" },
-          { href: "/dashboard/settings/apps-services", label: "Apps & Service" },
+          { href: "/dashboard/app-services", label: "Apps & Service" },
           { href: "/dashboard/settings/holidays", label: "Public Holidays" },
         ]
       },

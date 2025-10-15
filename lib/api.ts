@@ -1,7 +1,12 @@
 import axios from "axios"
 
+// Get API base URL from environment variables
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api/v1"
+
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/v1",
+  baseURL: API_BASE_URL,
+  timeout: 10000, // 10 second timeout
+  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
     "Accept": "application/json",
@@ -101,4 +106,36 @@ api.interceptors.response.use(
   }
 );
 
+// Export the configured axios instance
+export const apiClient = api
+
+// API service methods for common operations
+export const apiService = {
+  // Generic HTTP methods
+  get: <T = any>(url: string, config?: any) => api.get<T>(url, config),
+  post: <T = any>(url: string, data?: any, config?: any) => api.post<T>(url, data, config),
+  put: <T = any>(url: string, data?: any, config?: any) => api.put<T>(url, data, config),
+  patch: <T = any>(url: string, data?: any, config?: any) => api.patch<T>(url, data, config),
+  delete: <T = any>(url: string, config?: any) => api.delete<T>(url, config),
+  
+  // File upload helper
+  uploadFile: <T = any>(url: string, file: File, onProgress?: (progress: number) => void) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    return api.post<T>(url, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          onProgress(progress)
+        }
+      },
+    })
+  },
+}
+
+// Export both for compatibility
 export default api

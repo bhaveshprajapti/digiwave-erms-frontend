@@ -15,7 +15,9 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DatePicker } from "@/components/ui/date-picker"
+import { MobileInput } from "@/components/ui/mobile-input"
 import { MultiSelect } from "@/components/ui/multi-select"
+import { Eye, EyeOff } from "lucide-react"
 
 interface EmployeeFormData {
   username: string
@@ -98,6 +100,7 @@ export function EmployeeForm() {
   const [selectedDesignations, setSelectedDesignations] = useState<string[]>([])
   const [selectedShifts, setSelectedShifts] = useState<string[]>([])
   const [selectedTechnologies, setSelectedTechnologies] = useState<string[]>([])
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleChange = useCallback((field: keyof EmployeeFormData, value: string | number[] | boolean | File | null) => {
     setFormData(prev => ({ ...prev, [field]: value }))
@@ -123,6 +126,7 @@ export function EmployeeForm() {
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
+        plain_password: formData.password, // Backend will store this for admin viewing
         employee_type: parseInt(formData.employee_type),
         role: parseInt(formData.role),
         joining_date: joiningDate?.toISOString().split('T')[0],
@@ -233,25 +237,39 @@ export function EmployeeForm() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="+1 (555) 123-4567"
+                <Label htmlFor="phone">Mobile Number</Label>
+                <MobileInput
                   value={formData.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
+                  onChange={(value) => handleChange("phone", value)}
+                  placeholder="1234567890"
                 />
               </div>
               <div>
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  required
-                  value={formData.password}
-                  onChange={(e) => handleChange("password", e.target.value)}
-                />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter password"
+                    required
+                    value={formData.password}
+                    onChange={(e) => handleChange("password", e.target.value)}
+                    className="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-500" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -280,6 +298,9 @@ export function EmployeeForm() {
                     handleChange("birth_date", date?.toISOString().split('T')[0] || "")
                   }}
                   inputClassName="h-9"
+                  disableFuture={true}
+                  minDate={new Date(1950, 0, 1)}
+                  placeholder="DD/MM/YYYY"
                 />
               </div>
             </div>
@@ -471,6 +492,9 @@ export function EmployeeForm() {
                     setJoiningDate(date)
                     handleChange("joining_date", date?.toISOString().split('T')[0] || "")
                   }}
+                  maxDate={new Date()}
+                  minDate={new Date(2000, 0, 1)}
+                  placeholder="DD/MM/YYYY"
                 />
               </div>
             </div>
@@ -600,6 +624,8 @@ export function EmployeeForm() {
                   }}
                   inputClassName="h-9"
                   disabled={!formData.is_on_notice_period}
+                  minDate={new Date()}
+                  placeholder="DD/MM/YYYY"
                 />
               </div>
             </div>
