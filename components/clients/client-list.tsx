@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Eye, Edit, Trash2, FileText, Plus } from "lucide-react"
+import { Search, Eye, Edit, Trash2, Plus } from "lucide-react"
 import Link from "next/link"
 import { DataTable } from "@/components/common/data-table"
 import { ActionButtons } from "@/components/common/action-buttons"
 import { useToast } from "@/hooks/use-toast"
 import { ClientModal } from "./client-modal"
+import { ClientStats } from "./client-stats"
 import Swal from 'sweetalert2'
 import api from "@/lib/api"
 
@@ -21,7 +22,17 @@ interface Client {
   phone?: string
   gst_number?: string
   website?: string
-  rating: number
+  rating?: number
+  is_active?: boolean
+  address_info?: string
+  address_details?: {
+    line1?: string
+    line2?: string
+    city?: string
+    state?: string
+    country?: string
+    pincode?: string
+  }
   created_at: string
 }
 
@@ -33,6 +44,11 @@ export function ClientList() {
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add')
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const { toast } = useToast()
+  
+  // Calculate stats
+  const totalClients = clients.length
+  const activeClients = clients.filter(client => client.is_active !== false).length // Default to active if undefined
+  const inactiveClients = clients.filter(client => client.is_active === false).length
   
   useEffect(() => {
     fetchClients()
@@ -52,6 +68,66 @@ export function ClientList() {
     } finally {
       setLoading(false)
     }
+  }
+  
+  const handleAddClient = () => {
+    setModalMode('add')
+    setSelectedClient(null)
+    setIsModalOpen(true)
+  }
+  
+  const handleEditClient = async (client: Client) => {
+    try {
+      // Fetch complete client details for editing
+      const response = await api.get(`/clients/clients/${client.id}/`)
+      setModalMode('edit')
+      setSelectedClient(response.data)
+      setIsModalOpen(true)
+    } catch (error) {
+      console.error('Error fetching client details:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load client details",
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const handleDeleteClient = async (client: Client) => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `You are about to delete "${client.name}". This action cannot be undone!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    })
+
+    if (!result.isConfirmed) return
+
+    try {
+      await api.delete(`/clients/clients/${client.id}/`)
+      Swal.fire(
+        'Deleted!',
+        'The client has been deleted successfully.',
+        'success'
+      )
+      fetchClients() // Refresh the list
+    } catch (error: any) {
+      console.error("Error deleting client:", error)
+      Swal.fire(
+        'Error!',
+        'Failed to delete the client. Please try again.',
+        'error'
+      )
+    }
+  }
+  
+  const handleRefresh = () => {
+    fetchClients()
   }
 
   const filteredClients = clients.filter(
@@ -74,6 +150,15 @@ export function ClientList() {
   }
 
   return (
+    <>
+    {/* Client Stats */}
+    <ClientStats 
+      totalClients={totalClients}
+      activeClients={activeClients}
+      inactiveClients={inactiveClients}
+      loading={loading}
+    />
+    
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -88,11 +173,9 @@ export function ClientList() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button asChild>
-              <Link href="/dashboard/clients/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Client
-              </Link>
+            <Button onClick={handleAddClient}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Client
             </Button>
           </div>
         </div>
@@ -118,22 +201,26 @@ export function ClientList() {
                 )}
               </div>
             )},
-            { key: 'gst', header: 'GST Number', cell: (client) => client.gst_number || 'N/A' },
-            { key: 'rating', header: 'Rating', sortable: true, cell: (client) => (
-              <div className="flex items-center">
-                <span className="font-medium">{client.rating}/5</span>
+            { key: 'address', header: 'Address', cell: (client) => (
+              <div className="text-sm max-w-[200px]">
+                <div className="truncate">{client.address_info || 'N/A'}</div>
               </div>
+            )},
+            { key: 'gst', header: 'GST Number', cell: (client) => client.gst_number || 'N/A' },
+            { key: 'status', header: 'Status', cell: (client) => (
+              <Badge 
+                variant="outline" 
+                className={client.is_active !== false ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-700 border-gray-200"}
+              >
+                {client.is_active !== false ? 'Active' : 'Inactive'}
+              </Badge>
             )},
             { key: 'created', header: 'Created', sortable: true, sortAccessor: (c)=>new Date(c.created_at).getTime(), cell: (c)=> new Date(c.created_at).toLocaleDateString() },
             { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (client) => (
               <div className="flex items-center justify-center">
                 <ActionButtons
-                  extras={[
-                    { title: 'View Details', onClick: () => window.location.href = `/dashboard/clients/${client.id}`, icon: <Eye className="h-4 w-4" />},
-                    { title: 'Create Quote', onClick: () => window.location.href = `/dashboard/quotations/new?client=${client.id}`, icon: <FileText className="h-4 w-4" />},
-                    { title: 'Edit', onClick: () => window.location.href = `/dashboard/clients/${client.id}/edit`, icon: <Edit className="h-4 w-4" />},
-                    { title: 'Delete', onClick: () => {}, className: 'hover:bg-red-100', icon: <Trash2 className="h-4 w-4 text-red-600" />},
-                  ]}
+                  onEdit={() => handleEditClient(client)}
+                  onDelete={() => handleDeleteClient(client)}
                 />
               </div>
             )}
@@ -147,5 +234,15 @@ export function ClientList() {
         />
       </CardContent>
     </Card>
+    
+    {/* Client Modal */}
+    <ClientModal
+      isOpen={isModalOpen}
+      onClose={() => setIsModalOpen(false)}
+      client={selectedClient}
+      mode={modalMode}
+      onSuccess={handleRefresh}
+    />
+  </>
   )
 }

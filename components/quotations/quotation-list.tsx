@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,65 +8,73 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Search, MoreVertical, Eye, Download, Send, Trash2 } from "lucide-react"
-import Link from "next/link"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Search, MoreVertical, Eye, Download, Send, Trash2, Plus, Edit } from "lucide-react"
+import { useToast } from '@/hooks/use-toast'
+import { quotationService } from '@/services/api'
+import QuotationModal from './quotation-modal'
 
-const mockQuotations = [
-  {
-    id: "Q-2025-001",
-    client: "TechMart Inc.",
-    title: "E-commerce Platform Development",
-    amount: 150000,
-    status: "pending",
-    validUntil: "2025-10-31",
-    createdDate: "2025-10-01",
-  },
-  {
-    id: "Q-2025-002",
-    client: "FinanceHub",
-    title: "Mobile Banking App",
-    amount: 120000,
-    status: "accepted",
-    validUntil: "2025-10-15",
-    createdDate: "2025-09-15",
-  },
-  {
-    id: "Q-2025-003",
-    client: "SalesPro",
-    title: "CRM System Implementation",
-    amount: 85000,
-    status: "accepted",
-    validUntil: "2025-09-30",
-    createdDate: "2025-09-01",
-  },
-  {
-    id: "Q-2025-004",
-    client: "BrandCo",
-    title: "Marketing Website Redesign",
-    amount: 45000,
-    status: "rejected",
-    validUntil: "2025-09-20",
-    createdDate: "2025-08-25",
-  },
-  {
-    id: "Q-2025-005",
-    client: "DataCorp",
-    title: "Analytics Dashboard",
-    amount: 95000,
-    status: "pending",
-    validUntil: "2025-11-15",
-    createdDate: "2025-10-05",
-  },
-]
+interface Quotation {
+  id: number
+  client?: number
+  client_name?: string
+  client_email?: string
+  client_phone?: string
+  client_address?: string
+  quotation_number: string
+  title: string
+  description: string
+  status: string
+  issue_date: string
+  expiry_date: string
+  subtotal: number
+  tax_rate: number
+  tax_amount: number
+  discount_amount: number
+  total_amount: number
+  notes: string
+  terms_conditions: string
+}
 
 export function QuotationList() {
+  const { toast } = useToast()
+  const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeTab, setActiveTab] = useState("all")
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null)
+  const [modalMode, setModalMode] = useState<'add' | 'edit'>('add')
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [quotationToDelete, setQuotationToDelete] = useState<Quotation | null>(null)
 
-  const filteredQuotations = mockQuotations.filter((quote) => {
+  // Load quotations from API
+  const loadQuotations = async () => {
+    try {
+      setIsLoading(true)
+      const response = await quotationService.list()
+      setQuotations(response.data.results || response.data || [])
+    } catch (error) {
+      console.error('Failed to load quotations:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load quotations',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Load quotations on component mount
+  useEffect(() => {
+    loadQuotations()
+  }, [])
+
+  const filteredQuotations = quotations.filter((quote) => {
     const matchesSearch =
-      quote.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      quote.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      quote.quotation_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (quote.client_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       quote.title.toLowerCase().includes(searchQuery.toLowerCase())
 
     const matchesTab = activeTab === "all" || quote.status === activeTab
@@ -74,34 +82,87 @@ export function QuotationList() {
     return matchesSearch && matchesTab
   })
 
+  // Handle modal actions
+  const handleAddQuotation = () => {
+    setSelectedQuotation(null)
+    setModalMode('add')
+    setIsModalOpen(true)
+  }
+
+  const handleEditQuotation = (quotation: Quotation) => {
+    setSelectedQuotation(quotation)
+    setModalMode('edit')
+    setIsModalOpen(true)
+  }
+
+  const handleDeleteQuotation = (quotation: Quotation) => {
+    setQuotationToDelete(quotation)
+    setDeleteDialogOpen(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!quotationToDelete) return
+
+    try {
+      await quotationService.delete(quotationToDelete.id)
+      toast({
+        title: 'Success',
+        description: 'Quotation deleted successfully',
+      })
+      loadQuotations() // Refresh the list
+    } catch (error) {
+      console.error('Failed to delete quotation:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to delete quotation',
+        variant: 'destructive',
+      })
+    } finally {
+      setDeleteDialogOpen(false)
+      setQuotationToDelete(null)
+    }
+  }
+
+  const handleRefresh = () => {
+    loadQuotations()
+  }
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: "default" | "secondary" | "outline"; className: string }> = {
-      pending: { variant: "outline", className: "bg-yellow-50 text-yellow-700 border-yellow-200" },
+      draft: { variant: "outline", className: "bg-gray-50 text-gray-700 border-gray-200" },
+      sent: { variant: "outline", className: "bg-blue-50 text-blue-700 border-blue-200" },
       accepted: { variant: "outline", className: "bg-green-50 text-green-700 border-green-200" },
       rejected: { variant: "outline", className: "bg-red-50 text-red-700 border-red-200" },
-      draft: { variant: "outline", className: "bg-gray-50 text-gray-700 border-gray-200" },
+      expired: { variant: "outline", className: "bg-orange-50 text-orange-700 border-orange-200" },
     }
-    const config = variants[status] || variants.pending
+    const config = variants[status] || variants.draft
     return (
       <Badge variant={config.variant} className={config.className}>
-        {status}
+        {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     )
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>All Quotations</CardTitle>
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search quotations..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex items-center space-x-4">
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search quotations..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleAddQuotation}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Quotation
+            </Button>
           </div>
         </div>
       </CardHeader>
@@ -109,9 +170,11 @@ export function QuotationList() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="pending">Pending</TabsTrigger>
+            <TabsTrigger value="draft">Draft</TabsTrigger>
+            <TabsTrigger value="sent">Sent</TabsTrigger>
             <TabsTrigger value="accepted">Accepted</TabsTrigger>
             <TabsTrigger value="rejected">Rejected</TabsTrigger>
+            <TabsTrigger value="expired">Expired</TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="mt-4">
@@ -128,52 +191,99 @@ export function QuotationList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredQuotations.map((quote) => (
-                  <TableRow key={quote.id}>
-                    <TableCell className="font-medium">{quote.id}</TableCell>
-                    <TableCell>{quote.client}</TableCell>
-                    <TableCell>{quote.title}</TableCell>
-                    <TableCell className="font-medium">${quote.amount.toLocaleString()}</TableCell>
-                    <TableCell>{new Date(quote.validUntil).toLocaleDateString()}</TableCell>
-                    <TableCell>{getStatusBadge(quote.status)}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/quotations/${quote.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download PDF
-                          </DropdownMenuItem>
-                          {quote.status === "pending" && (
-                            <DropdownMenuItem>
-                              <Send className="mr-2 h-4 w-4" />
-                              Send to Client
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8">
+                      Loading quotations...
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : filteredQuotations.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No quotations found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredQuotations.map((quote) => (
+                    <TableRow key={quote.id}>
+                      <TableCell className="font-medium">{quote.quotation_number}</TableCell>
+                      <TableCell>{quote.client_name || 'No client'}</TableCell>
+                      <TableCell>{quote.title}</TableCell>
+                      <TableCell className="font-medium">${quote.total_amount.toLocaleString()}</TableCell>
+                      <TableCell>
+                        {quote.expiry_date ? new Date(quote.expiry_date).toLocaleDateString() : 'No expiry'}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(quote.status)}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditQuotation(quote)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download PDF
+                            </DropdownMenuItem>
+                            {quote.status === "draft" && (
+                              <DropdownMenuItem>
+                                <Send className="mr-2 h-4 w-4" />
+                                Send to Client
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteQuotation(quote)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </TabsContent>
         </Tabs>
       </CardContent>
     </Card>
+    
+    {/* Quotation Modal */}
+    <QuotationModal
+      isOpen={isModalOpen}
+      onClose={() => setIsModalOpen(false)}
+      quotation={selectedQuotation}
+      mode={modalMode}
+      onSuccess={handleRefresh}
+    />
+    
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. This will permanently delete the quotation
+            "{quotationToDelete?.quotation_number}".
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   )
 }

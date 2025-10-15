@@ -1,38 +1,33 @@
 "use client"
 
 import { StatusCard } from "@/components/ui/status-card"
-import { Users, TrendingUp, DollarSign, FileText } from "lucide-react"
+import { Users, UserCheck } from "lucide-react"
 
-const stats = [
-  {
-    title: "Total Clients",
-    status: "48",
-    icon: Users,
-    statusColor: "primary" as const,
-  },
-  {
-    title: "Active Projects",
-    status: "24",
-    icon: TrendingUp,
-    statusColor: "success" as const,
-  },
-  {
-    title: "Total Revenue",
-    status: "$2.4M",
-    icon: DollarSign,
-    statusColor: "info" as const,
-  },
-  {
-    title: "Pending Quotes",
-    status: "12",
-    icon: FileText,
-    statusColor: "warning" as const,
-  },
-]
+interface ClientStatsProps {
+  totalClients: number
+  activeClients: number
+  inactiveClients: number
+  loading?: boolean
+}
 
-export function ClientStats() {
+export function ClientStats({ totalClients, activeClients, inactiveClients, loading }: ClientStatsProps) {
+  const stats = [
+    {
+      title: "Total Clients",
+      status: loading ? "..." : (totalClients || 0).toString(),
+      icon: Users,
+      statusColor: "primary" as const,
+    },
+    {
+      title: "Active Clients",
+      status: loading ? "..." : (activeClients || 0).toString(),
+      icon: UserCheck,
+      statusColor: "success" as const,
+    },
+  ]
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 mb-6">
       {stats.map((stat) => (
         <StatusCard
           key={stat.title}

@@ -14,15 +14,15 @@ interface ClientFormData {
   name: string
   email: string
   phone: string
-  gst_number: string
   website: string
-  rating: number
   address_line1: string
   address_line2: string
-  address_city: string
-  address_state: string
   address_country: string
+  address_state: string
+  address_city: string
   address_pincode: string
+  company_name: string
+  gst_number: string
   is_active: boolean
 }
 
@@ -33,8 +33,9 @@ interface Client {
   phone?: string
   gst_number?: string
   website?: string
-  rating: number
-  address?: {
+  rating?: number
+  is_active?: boolean
+  address_details?: {
     line1?: string
     line2?: string
     city?: string
@@ -42,6 +43,7 @@ interface Client {
     country?: string
     pincode?: string
   }
+  address_info?: string
   created_at: string
 }
 
@@ -62,15 +64,15 @@ export function ClientModal({ isOpen, onClose, client, mode, onSuccess }: Client
     name: "",
     email: "",
     phone: "",
-    gst_number: "",
     website: "",
-    rating: 5,
     address_line1: "",
     address_line2: "",
-    address_city: "",
-    address_state: "",
     address_country: "India",
+    address_state: "",
+    address_city: "",
     address_pincode: "",
+    company_name: "",
+    gst_number: "",
     is_active: true,
   })
 
@@ -88,16 +90,16 @@ export function ClientModal({ isOpen, onClose, client, mode, onSuccess }: Client
         name: client.name || "",
         email: client.email || "",
         phone: client.phone || "",
-        gst_number: client.gst_number || "",
         website: client.website || "",
-        rating: client.rating || 5,
-        address_line1: client.address?.line1 || "",
-        address_line2: client.address?.line2 || "",
-        address_city: client.address?.city || "",
-        address_state: client.address?.state || "",
-        address_country: client.address?.country || "India",
-        address_pincode: client.address?.pincode || "",
-        is_active: true, // Clients don't have is_active in the model, defaulting to true
+        address_line1: client.address_details?.line1 || "",
+        address_line2: client.address_details?.line2 || "",
+        address_country: client.address_details?.country || "India",
+        address_state: client.address_details?.state || "",
+        address_city: client.address_details?.city || "",
+        address_pincode: client.address_details?.pincode || "",
+        company_name: client.name || "", // Using name as company name fallback
+        gst_number: client.gst_number || "",
+        is_active: client.is_active !== undefined ? client.is_active : true,
       })
     } else {
       // Reset form for add mode
@@ -105,15 +107,15 @@ export function ClientModal({ isOpen, onClose, client, mode, onSuccess }: Client
         name: "",
         email: "",
         phone: "",
-        gst_number: "",
         website: "",
-        rating: 5,
         address_line1: "",
         address_line2: "",
-        address_city: "",
-        address_state: "",
         address_country: "India",
+        address_state: "",
+        address_city: "",
         address_pincode: "",
+        company_name: "",
+        gst_number: "",
         is_active: true,
       })
     }
@@ -141,9 +143,17 @@ export function ClientModal({ isOpen, onClose, client, mode, onSuccess }: Client
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
-        gst_number: formData.gst_number,
         website: formData.website,
-        rating: formData.rating,
+        gst_number: formData.gst_number,
+        company_name: formData.company_name,
+        // Address fields
+        address_line1: formData.address_line1,
+        address_line2: formData.address_line2,
+        address_country: formData.address_country,
+        address_state: formData.address_state,
+        address_city: formData.address_city,
+        address_pincode: formData.address_pincode,
+        is_active: formData.is_active,
       }
 
       if (mode === 'edit' && client?.id) {
@@ -329,41 +339,6 @@ export function ClientModal({ isOpen, onClose, client, mode, onSuccess }: Client
                       </td>
                     </tr>
 
-                    <tr>
-                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">GST Number</th>
-                      <td className="p-2 border">
-                        <div>
-                          <Input
-                            id="gst_number"
-                            placeholder="Enter GST number"
-                            className={`h-9 ${fieldErrors.gst_number ? 'border-red-500 focus:border-red-500' : ''}`}
-                            value={formData.gst_number}
-                            onChange={(e) => handleChange("gst_number", e.target.value.toUpperCase())}
-                          />
-                          {fieldErrors.gst_number && (
-                            <p className="mt-1 text-xs text-red-600">{fieldErrors.gst_number}</p>
-                          )}
-                        </div>
-                      </td>
-                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Rating</th>
-                      <td className="p-2 border">
-                        <div>
-                          <Input
-                            id="rating"
-                            type="number"
-                            min="1"
-                            max="5"
-                            placeholder="1-5"
-                            className={`h-9 ${fieldErrors.rating ? 'border-red-500 focus:border-red-500' : ''}`}
-                            value={formData.rating}
-                            onChange={(e) => handleChange("rating", parseInt(e.target.value) || 1)}
-                          />
-                          {fieldErrors.rating && (
-                            <p className="mt-1 text-xs text-red-600">{fieldErrors.rating}</p>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
 
                     {/* Address Information */}
                     <tr className="bg-gray-100">
@@ -372,52 +347,18 @@ export function ClientModal({ isOpen, onClose, client, mode, onSuccess }: Client
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        Address Information
+                        Address
                       </th>
                     </tr>
                     <tr>
-                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Address Line 1</th>
+                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Street / Locality</th>
                       <td colSpan={3} className="p-2 border">
-                        <Input
+                        <Textarea
                           id="address_line1"
-                          placeholder="Enter address line 1"
-                          className="h-9"
+                          placeholder="Enter full address"
+                          className="min-h-[60px] resize-none"
                           value={formData.address_line1}
                           onChange={(e) => handleChange("address_line1", e.target.value)}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Address Line 2</th>
-                      <td colSpan={3} className="p-2 border">
-                        <Input
-                          id="address_line2"
-                          placeholder="Enter address line 2 (optional)"
-                          className="h-9"
-                          value={formData.address_line2}
-                          onChange={(e) => handleChange("address_line2", e.target.value)}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">City</th>
-                      <td className="p-2 border">
-                        <Input
-                          id="address_city"
-                          placeholder="Enter city"
-                          className="h-9"
-                          value={formData.address_city}
-                          onChange={(e) => handleChange("address_city", e.target.value)}
-                        />
-                      </td>
-                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">State</th>
-                      <td className="p-2 border">
-                        <Input
-                          id="address_state"
-                          placeholder="Enter state"
-                          className="h-9"
-                          value={formData.address_state}
-                          onChange={(e) => handleChange("address_state", e.target.value)}
                         />
                       </td>
                     </tr>
@@ -432,15 +373,86 @@ export function ClientModal({ isOpen, onClose, client, mode, onSuccess }: Client
                           onChange={(e) => handleChange("address_country", e.target.value)}
                         />
                       </td>
+                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">State</th>
+                      <td className="p-2 border">
+                        <Input
+                          id="address_state"
+                          placeholder="Enter state"
+                          className="h-9"
+                          value={formData.address_state}
+                          onChange={(e) => handleChange("address_state", e.target.value)}
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">City</th>
+                      <td className="p-2 border">
+                        <Input
+                          id="address_city"
+                          placeholder="Enter city"
+                          className="h-9"
+                          value={formData.address_city}
+                          onChange={(e) => handleChange("address_city", e.target.value)}
+                        />
+                      </td>
                       <th className="p-2 text-left text-sm font-medium text-gray-600 border">Pincode</th>
                       <td className="p-2 border">
                         <Input
                           id="address_pincode"
-                          placeholder="Enter pincode"
+                          placeholder="Enter postal code"
                           className="h-9"
                           value={formData.address_pincode}
                           onChange={(e) => handleChange("address_pincode", e.target.value)}
                         />
+                      </td>
+                    </tr>
+
+                    {/* Company Details */}
+                    <tr className="bg-gray-100">
+                      <th colSpan={4} className="p-2 text-left text-sm font-semibold text-gray-700">
+                        <svg className="w-4 h-4 inline-block mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-2m-2 0H5m14 0v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5m14 0H7" />
+                        </svg>
+                        Company Details
+                      </th>
+                    </tr>
+                    <tr>
+                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Company Name</th>
+                      <td className="p-2 border">
+                        <Input
+                          id="company_name"
+                          placeholder="Enter company name"
+                          className="h-9"
+                          value={formData.company_name}
+                          onChange={(e) => handleChange("company_name", e.target.value)}
+                        />
+                      </td>
+                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">GST Number</th>
+                      <td className="p-2 border">
+                        <Input
+                          id="gst_number"
+                          placeholder="Enter GST number"
+                          className="h-9"
+                          value={formData.gst_number}
+                          onChange={(e) => handleChange("gst_number", e.target.value.toUpperCase())}
+                        />
+                      </td>
+                    </tr>
+                    
+                    {/* Status */}
+                    <tr>
+                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Status</th>
+                      <td colSpan={3} className="p-2 border">
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="is_active"
+                            checked={formData.is_active}
+                            onCheckedChange={(checked) => handleChange("is_active", checked)}
+                          />
+                          <Label htmlFor="is_active" className="text-sm font-medium">
+                            {formData.is_active ? 'Active' : 'Inactive'}
+                          </Label>
+                        </div>
                       </td>
                     </tr>
                   </tbody>
