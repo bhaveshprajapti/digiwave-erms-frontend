@@ -21,6 +21,7 @@ import { useCurrentUser } from "@/hooks/use-current-user"
 
 interface EmployeeListItem {
   id: string
+  employee_id?: string
   username: string
   first_name: string
   last_name: string
@@ -72,6 +73,7 @@ export function EmployeeList() {
     
     return {
       id: safeEmp.id || '',
+      employee_id: safeEmp.employee_id || '',
       username: safeEmp.username || '',
       first_name: safeEmp.first_name || safeEmp.name || '',
       last_name: safeEmp.last_name || '',
@@ -213,7 +215,7 @@ export function EmployeeList() {
           <DataTable<EmployeeListItem>
             columns={[
               { key: 'sr', header: 'Sr No.', cell: (_e, i) => <span className="font-medium">{i + 1}</span>, className: 'w-16' },
-              { key: 'username', header: 'Username', cell: (e) => (
+              { key: 'employee_id', header: 'Employee ID', cell: (e) => (
                 <button 
                   onClick={() => {
                     setSelectedEmployeeId(e.id)
@@ -221,7 +223,7 @@ export function EmployeeList() {
                   }}
                   className="text-primary hover:text-primary/80 font-medium hover:underline cursor-pointer"
                 >
-                  {e.username}
+                  {e.employee_id || 'N/A'}
                 </button>
               )},
               { key: 'full_name', header: 'Full Name', cell: (e) => (

@@ -7,19 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
-
 interface AppServiceFormData {
   id?: string
   name: string
-  description: string
   is_active: boolean
 }
 
 interface AppService {
   id: string
   name: string
-  description?: string
   is_active: boolean
   created_at: string
 }
@@ -39,7 +35,6 @@ export function AppServiceModal({ isOpen, onClose, appService, mode, onSuccess }
 
   const [formData, setFormData] = useState<AppServiceFormData>({
     name: "",
-    description: "",
     is_active: true,
   })
 
@@ -55,14 +50,12 @@ export function AppServiceModal({ isOpen, onClose, appService, mode, onSuccess }
       setFormData({
         id: appService.id,
         name: appService.name || "",
-        description: appService.description || "",
         is_active: appService.is_active ?? true,
       })
     } else {
       // Reset form for add mode
       setFormData({
         name: "",
-        description: "",
         is_active: true,
       })
     }
@@ -222,25 +215,6 @@ export function AppServiceModal({ isOpen, onClose, appService, mode, onSuccess }
                           />
                           {fieldErrors.name && (
                             <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-
-                    <tr>
-                      <th className="p-2 text-left text-sm font-medium text-gray-600 border">Description</th>
-                      <td className="p-2 border">
-                        <div>
-                          <Textarea
-                            id="description"
-                            placeholder="Enter description (optional)"
-                            className={`min-h-[80px] resize-none ${fieldErrors.description ? 'border-red-500 focus:border-red-500' : ''}`}
-                            value={formData.description}
-                            onChange={(e) => handleChange("description", e.target.value)}
-                            rows={3}
-                          />
-                          {fieldErrors.description && (
-                            <p className="mt-1 text-xs text-red-600">{fieldErrors.description}</p>
                           )}
                         </div>
                       </td>

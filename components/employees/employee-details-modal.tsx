@@ -19,6 +19,7 @@ type EmployeeDetails = { bank_details?: BankDetails; document_link?: string | nu
 
 export interface Employee {
   id?: string | number
+  employee_id?: string
   username?: string
   first_name?: string
   last_name?: string
@@ -213,7 +214,7 @@ export function EmployeeDetailsModal({ employeeId, isOpen, onClose }: EmployeeDe
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">ID:</span> {employee.id || "N/A"}
+                  <span className="font-medium">Employee ID:</span> {employee.employee_id || "N/A"}
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">Username:</span> {employee.username || "N/A"}

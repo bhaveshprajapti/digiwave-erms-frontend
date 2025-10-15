@@ -4,7 +4,6 @@ import api from "@/lib/api"
 export interface EmployeeType {
   id: number
   name: string
-  description: string | null
   is_active: boolean
 }
 
@@ -12,7 +11,6 @@ export interface Role {
   id: number
   name: string
   display_name: string
-  description: string | null
   is_active: boolean
 }
 

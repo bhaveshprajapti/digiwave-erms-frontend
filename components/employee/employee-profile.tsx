@@ -311,7 +311,7 @@ export function EmployeeProfile() {
                   <h3 className="text-xl font-semibold">{user?.first_name} {user?.last_name}</h3>
                   <p className="text-gray-600">{user?.email}</p>
                   <Badge className="mt-2 bg-green-100 text-green-800 border-green-200">
-                    Employee ID: {user?.id}
+                    Employee ID: {user?.employee_id || 'N/A'}
                   </Badge>
                 </div>
               </div>

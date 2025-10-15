@@ -18,7 +18,6 @@ export default function RolesPage() {
       const payload: any = {
         name: data.name,
         display_name: data.name,
-        description: data.description,
         is_active: data.is_active,
       }
       return createRole(payload)
@@ -60,7 +59,6 @@ export default function RolesPage() {
           isLoading={isLoading}
           fields={[
             { key: "name", label: "Name", type: "text" },
-            { key: "description", label: "Description", type: "text" },
             { key: "is_active", label: "Status", type: "switch" },
           ]}
           onAdd={async (data) => addRole.mutate(data)}

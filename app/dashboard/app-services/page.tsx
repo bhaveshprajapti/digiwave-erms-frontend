@@ -9,14 +9,13 @@ import { DataTable } from "@/components/common/data-table"
 import { ActionButtons } from "@/components/common/action-buttons"
 import { AppServiceModal } from "@/components/app-services/app-service-modal"
 import { useAppServices } from "@/hooks/use-app-services"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { deleteAppService } from "@/hooks/use-app-services"
+import Swal from 'sweetalert2'
 
 interface AppService {
   id: string
   name: string
-  description?: string
   is_active: boolean
   created_at: string
 }
@@ -25,8 +24,6 @@ export default function AppServicesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add')
   const [selectedAppService, setSelectedAppService] = useState<AppService | null>(null)
-  const [appServiceToDelete, setAppServiceToDelete] = useState<AppService | null>(null)
-  const [isDeleting, setIsDeleting] = useState(false)
   
   const { appServices, isLoading, error, mutate } = useAppServices()
   const { toast } = useToast()
@@ -43,30 +40,45 @@ export default function AppServicesPage() {
     setIsModalOpen(true)
   }
 
-  const handleDeleteAppService = (appService: AppService) => {
-    setAppServiceToDelete(appService)
-  }
+  const handleDeleteAppService = async (appService: AppService) => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `You are about to delete "${appService.name}". This action cannot be undone!`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    })
 
-  const confirmDelete = async () => {
-    if (!appServiceToDelete) return
-    
-    setIsDeleting(true)
+    if (!result.isConfirmed) return
+
     try {
-      await deleteAppService(appServiceToDelete.id)
+      await deleteAppService(appService.id)
+      Swal.fire(
+        'Deleted!',
+        'The app service has been deleted successfully.',
+        'success'
+      )
       toast({
         title: "Success",
         description: "App Service deleted successfully",
       })
       mutate()
     } catch (error: any) {
+      console.error("Error deleting app service:", error)
+      Swal.fire(
+        'Error!',
+        'Failed to delete the app service. Please try again.',
+        'error'
+      )
       toast({
         variant: "destructive",
         title: "Error",
         description: error.response?.data?.message || "Failed to delete app service",
       })
-    } finally {
-      setIsDeleting(false)
-      setAppServiceToDelete(null)
     }
   }
 
@@ -165,11 +177,6 @@ export default function AppServicesPage() {
                 sortable: true
               },
               { 
-                key: 'description', 
-                header: 'Description', 
-                cell: (item) => <span className="text-sm text-muted-foreground">{item.description || '-'}</span> 
-              },
-              { 
                 key: 'is_active', 
                 header: 'Status', 
                 cell: (item) => (
@@ -216,28 +223,6 @@ export default function AppServicesPage() {
         onSuccess={handleRefresh}
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!appServiceToDelete} onOpenChange={(open) => !open && setAppServiceToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the app service
-              <strong> "{appServiceToDelete?.name}"</strong>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmDelete}
-              disabled={isDeleting}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isDeleting ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

@@ -77,7 +77,6 @@ export interface Role {
   id: number
   name: string
   display_name: string
-  description: string | null
   is_active: boolean
   permissions?: number[]
 }
@@ -85,7 +84,6 @@ export interface Role {
 export interface EmployeeType {
   id: number
   name: string
-  description: string | null
   is_active: boolean
 }
 

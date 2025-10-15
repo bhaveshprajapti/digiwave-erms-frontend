@@ -20,7 +20,6 @@ import { Eye, EyeOff } from "lucide-react"
 
 interface EmployeeFormData {
   id?: number
-  username: string
   first_name: string
   last_name: string
   email: string
@@ -75,7 +74,6 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
 
 
   const [formData, setFormData] = useState<EmployeeFormData>({
-    username: "",
     first_name: "",
     last_name: "",
     email: "",
@@ -250,8 +248,26 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
   }, [employee, mode, isOpen])
 
 
+  const generateUsernamePreview = useCallback((firstName: string) => {
+    if (!firstName || mode === 'edit') return ''
+    
+    // Clean first name (remove special chars, make lowercase)
+    const baseUsername = firstName.replace(/[^a-zA-Z]/g, '').toLowerCase()
+    if (!baseUsername) return ''
+    
+    return `DW_${baseUsername}##`  // ## represents unique digits that will be generated
+  }, [mode])
+
   const handleChange = useCallback((field: keyof EmployeeFormData, value: string | number[] | boolean | File | null) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    const newFormData = { ...formData, [field]: value }
+    
+    // Generate username preview when first name changes
+    if (field === 'first_name' && typeof value === 'string') {
+      newFormData.username = generateUsernamePreview(value)
+    }
+    
+    setFormData(newFormData)
+    
     // Clear field error when user starts typing
     if (fieldErrors[field]) {
       setFieldErrors(prev => {
@@ -260,7 +276,7 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
         return newErrors
       })
     }
-  }, [fieldErrors])
+  }, [fieldErrors, formData, generateUsernamePreview])
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -272,7 +288,10 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
       const formDataToSend = new FormData()
       
       // Add basic fields
-      formDataToSend.append('username', formData.username)
+      // Don't send username for new employees - it will be auto-generated
+      if (mode === 'edit' && formData.username) {
+        formDataToSend.append('username', formData.username)
+      }
       formDataToSend.append('first_name', formData.first_name)
       formDataToSend.append('last_name', formData.last_name)
       formDataToSend.append('email', formData.email)
@@ -540,14 +559,24 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                         <div>
                           <Input
                             id="username"
-                            placeholder="Choose a username"
-                            required
-                            className={`h-9 ${fieldErrors.username ? 'border-red-500 focus:border-red-500' : ''}`}
+                            placeholder={mode === 'add' ? "Enter first name to preview username" : "Username (read-only)"}
+                            disabled
+                            className={`h-9 bg-gray-100 ${fieldErrors.username ? 'border-red-500 focus:border-red-500' : ''}`}
                             value={formData.username}
                             onChange={(e) => handleChange("username", e.target.value)}
                           />
                           {fieldErrors.username && (
                             <p className="mt-1 text-xs text-red-600">{fieldErrors.username}</p>
+                          )}
+                          {mode === 'add' && formData.username && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              Preview: Final username will have unique digits instead of ##
+                            </p>
+                          )}
+                          {mode === 'add' && !formData.username && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Enter first name to see username preview
+                            </p>
                           )}
                         </div>
                       </td>

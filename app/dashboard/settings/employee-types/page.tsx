@@ -79,7 +79,6 @@ export default function EmployeeTypesPage() {
           isLoading={isLoading}
           fields={[
             { key: "name", label: "Name", type: "text" },
-            { key: "description", label: "Description", type: "text" },
             { key: "is_active", label: "Status", type: "switch" },
           ]}
           onAdd={handleAdd}
