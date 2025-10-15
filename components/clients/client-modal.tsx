@@ -161,12 +161,14 @@ export function ClientModal({ isOpen, onClose, client, mode, onSuccess }: Client
         toast({
           title: "Success",
           description: "Client updated successfully",
+          variant: "success"
         })
       } else {
         await api.post('/clients/clients/', submitData)
         toast({
           title: "Success",
           description: "Client created successfully",
+          variant: "success"
         })
       }
 

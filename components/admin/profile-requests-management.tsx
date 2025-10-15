@@ -109,6 +109,7 @@ export function ProfileRequestsManagement() {
       toast({
         title: action === 'approve' ? 'Approved' : 'Rejected',
         description: `${pending.length} change(s) ${action}d for ${selectedUser?.user_name || ''}`,
+        variant: 'success'
       })
       await loadRequests()
       setAdminComment('')
@@ -205,45 +206,39 @@ export function ProfileRequestsManagement() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Grouped by User Table */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <div className="relative">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center space-x-2">
+              <User className="h-5 w-5" />
+              <span>Profile Update Requests by Employee ({groupedByUser.length})</span>
+            </CardTitle>
+            <div className="flex items-center space-x-4">
+              <div className="relative w-64">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Search by employee name, email, or field..."
+                  placeholder="Search by employee name, email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Filter className="h-4 w-4 text-gray-500" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
+              <div className="flex items-center space-x-2">
+                <Filter className="h-4 w-4 text-gray-500" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Grouped by User Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <User className="h-5 w-5" />
-            <span>Profile Update Requests by Employee ({groupedByUser.length})</span>
-          </CardTitle>
         </CardHeader>
         <CardContent>
           {groupedByUser.length === 0 ? (

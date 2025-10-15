@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Search, Loader2, Plus, Clock, DollarSign } from "lucide-react"
 import { DataTable, Column } from "@/components/common/data-table"
 import { ActionButtons } from "@/components/common/action-buttons"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
-import { deleteEmployee } from "@/hooks/use-employees"
+import { deleteEmployee, updateEmployee } from "@/hooks/use-employees"
 import { EmployeeModal } from "./employee-modal"
 import { EmployeeDetailsModal } from "./employee-details-modal"
 import api from "@/lib/api"
@@ -251,9 +252,23 @@ export function EmployeeList() {
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{getEmployeeTypeName(e.employee_type)}</Badge>
               )},
               { key: 'status', header: 'Status', cell: (e) => (
-                <Badge variant={e.is_active ? 'default' : 'secondary'} className={e.is_active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
-                  {e.is_active ? 'Active' : 'Inactive'}
-                </Badge>
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={e.is_active}
+                    onCheckedChange={async (checked) => {
+                      try {
+                        await updateEmployee(e.id, { is_active: checked })
+                        toast({ title: 'Success', description: 'Employee status updated successfully' })
+                        mutate()
+                      } catch (error) {
+                        toast({ title: 'Error', description: 'Failed to update employee status', variant: 'destructive' })
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    {e.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               )},
               { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (employee) => (
                 <div className="flex items-center justify-center">

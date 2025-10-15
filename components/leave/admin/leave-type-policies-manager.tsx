@@ -117,13 +117,15 @@ export function LeaveTypePoliciesManager() {
         await updateLeavePolicy(editingId, formData)
         toast({
           title: "Success",
-          description: "Policy updated successfully"
+          description: "Policy updated successfully",
+          variant: "success"
         })
       } else {
         await createLeavePolicy(formData)
         toast({
           title: "Success", 
-          description: "Policy created successfully"
+          description: "Policy created successfully",
+          variant: "success"
         })
       }
       
@@ -203,13 +205,20 @@ export function LeaveTypePoliciesManager() {
       await deleteLeavePolicy(policy.id)
       toast({
         title: "Success",
-        description: "Policy deleted successfully"
+        description: "Policy deleted successfully",
+        variant: "success"
       })
       fetchData()
     } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail || 
+                          error?.response?.data?.message || 
+                          error?.response?.data?.[0] || 
+                          error?.message || 
+                          "Failed to delete policy"
+      
       toast({
         title: "Error",
-        description: error?.response?.data?.message || "Failed to delete policy",
+        description: errorMessage,
         variant: "destructive"
       })
     }
@@ -227,13 +236,20 @@ export function LeaveTypePoliciesManager() {
       await updateLeavePolicy(policy.id, { is_active: !policy.is_active })
       toast({
         title: "Success",
-        description: `Policy ${!policy.is_active ? 'activated' : 'deactivated'} successfully`
+        description: `Policy ${!policy.is_active ? 'activated' : 'deactivated'} successfully`,
+        variant: "success"
       })
       fetchData()
     } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail || 
+                          error?.response?.data?.message || 
+                          error?.response?.data?.[0] || 
+                          error?.message || 
+                          "Failed to update status"
+      
       toast({
         title: "Error",
-        description: error?.response?.data?.message || "Failed to update status",
+        description: errorMessage,
         variant: "destructive"
       })
     } finally {

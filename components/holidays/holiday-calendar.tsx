@@ -81,18 +81,37 @@ const openEdit = (h: Holiday, readOnly=false) => {
   const save = async () => {
     try {
       setSaving(true)
-      // Fix timezone issue by using local date formatting instead of toISOString()
-      const dateStr = form.date ? formatDateToString(form.date) : ""
-      if (!dateStr || !form.title.trim()) {
-        toast({ title: 'Validation', description: 'Please enter date and title', variant: 'destructive' });
+      
+      // Validation
+      if (!form.date) {
+        toast({ title: 'Validation Error', description: 'Please select a date', variant: 'destructive' });
         return
       }
-if (editing) {
+      
+      if (!form.title.trim()) {
+        toast({ title: 'Validation Error', description: 'Please enter a holiday title', variant: 'destructive' });
+        return
+      }
+      
+      const dateStr = formatDateToString(form.date)
+      
+      // Check for duplicate dates (only when creating new or changing date)
+      const existingHoliday = holidays.find(h => h.date === dateStr)
+      if (existingHoliday && (!editing || existingHoliday.id !== editing.id)) {
+        toast({ 
+          title: 'Duplicate Date', 
+          description: `A holiday already exists on ${formatDateDDMMYYYY(dateStr)}: "${existingHoliday.title}"`, 
+          variant: 'destructive' 
+        });
+        return
+      }
+      
+      if (editing) {
         await updateHoliday({ id: editing.id, data: { date: dateStr, title: form.title.trim() } })
-        toast({ title: 'Updated', description: 'Holiday updated' })
+        toast({ title: 'Success', description: 'Holiday updated successfully', variant: 'success' })
       } else {
         await addHoliday({ date: dateStr, title: form.title.trim() })
-        toast({ title: 'Created', description: 'Holiday created' })
+        toast({ title: 'Success', description: 'Holiday created successfully', variant: 'success' })
       }
       setIsModalOpen(false)
     } catch (e:any) {
@@ -118,7 +137,7 @@ const confirmAndDelete = async (id: number, label?: string) => {
     try {
       await deleteHoliday(id)
       Swal.fire('Deleted!', 'The holiday has been deleted successfully.', 'success')
-      toast({ title: 'Deleted', description: 'Holiday removed' })
+      toast({ title: 'Success', description: 'Holiday deleted successfully', variant: 'success' })
       return true
     } catch (e:any) {
       Swal.fire('Error!', 'Failed to delete the holiday. Please try again.', 'error')
@@ -211,12 +230,12 @@ const renderModal = () => (
                   <button
                     type="button"
                     key={day}
-                    className={`relative flex h-10 items-center justify-center rounded-lg border text-xs font-medium hover:bg-muted ${holiday ? 'bg-green-50 border-green-200' : ''}`}
+                    className={`relative flex h-10 items-center justify-center rounded-lg border text-xs font-medium hover:bg-muted ${holiday ? 'bg-green-100 border-green-300' : ''}`}
                     onClick={() => holiday ? openEdit(holiday, true) : undefined}
                   >
                     <span className="absolute top-1 left-1 text-[10px] text-muted-foreground">{day}</span>
                     {holiday && (
-                      <span className="text-[10px] font-medium text-green-700 text-center px-2 truncate max-w-[90%]">{holiday.title}</span>
+                      <span className="text-[10px] font-medium text-green-800 text-center px-2 truncate max-w-[90%]">{holiday.title}</span>
                     )}
                   </button>
                 )

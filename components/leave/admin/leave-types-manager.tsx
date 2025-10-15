@@ -89,13 +89,15 @@ export function LeaveTypesManager() {
         await updateLeaveType(editingId, formData)
         toast({
           title: "Success",
-          description: "Leave type updated successfully"
+          description: "Leave type updated successfully",
+          variant: "success"
         })
       } else {
         await createLeaveType(formData)
         toast({
           title: "Success", 
-          description: "Leave type created successfully"
+          description: "Leave type created successfully",
+          variant: "success"
         })
       }
       
@@ -163,13 +165,20 @@ export function LeaveTypesManager() {
       await deleteLeaveType(id)
       toast({
         title: "Success",
-        description: "Leave type deleted successfully"
+        description: "Leave type deleted successfully",
+        variant: "success"
       })
       fetchLeaveTypes()
     } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail || 
+                          error?.response?.data?.message || 
+                          error?.response?.data?.[0] || 
+                          error?.message || 
+                          "Failed to delete leave type"
+      
       toast({
         title: "Error",
-        description: error?.response?.data?.message || "Failed to delete leave type",
+        description: errorMessage,
         variant: "destructive"
       })
     } finally {
@@ -189,13 +198,20 @@ export function LeaveTypesManager() {
       await updateLeaveType(leaveType.id, { is_active: !leaveType.is_active })
       toast({
         title: "Success",
-        description: `Leave type ${!leaveType.is_active ? 'activated' : 'deactivated'} successfully`
+        description: `Leave type ${!leaveType.is_active ? 'activated' : 'deactivated'} successfully`,
+        variant: "success"
       })
       fetchLeaveTypes()
     } catch (error: any) {
+      const errorMessage = error?.response?.data?.detail || 
+                          error?.response?.data?.message || 
+                          error?.response?.data?.[0] || 
+                          error?.message || 
+                          "Failed to update status"
+      
       toast({
         title: "Error",
-        description: error?.response?.data?.message || "Failed to update status",
+        description: errorMessage,
         variant: "destructive"
       })
     } finally {

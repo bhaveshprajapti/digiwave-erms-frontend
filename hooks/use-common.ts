@@ -104,8 +104,8 @@ export function useTechnologies() {
     return response.data
   }
 
-  const updateTechnology = async (id: number, technologyData: { name: string; description?: string; category?: string; is_active?: boolean }) => {
-    const response = await api.put(`/common/technologies/${id}/`, technologyData)
+  const updateTechnology = async (id: number, technologyData: Partial<{ name: string; description?: string; category?: string; is_active: boolean }>) => {
+    const response = await api.patch(`/common/technologies/${id}/`, technologyData)
     mutate()
     return response.data
   }

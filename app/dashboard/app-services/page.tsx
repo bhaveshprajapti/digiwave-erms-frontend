@@ -4,11 +4,12 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
 import { Plus } from "lucide-react"
 import { DataTable } from "@/components/common/data-table"
 import { ActionButtons } from "@/components/common/action-buttons"
 import { AppServiceModal } from "@/components/app-services/app-service-modal"
-import { useAppServices } from "@/hooks/use-app-services"
+import { useAppServices, updateAppService } from "@/hooks/use-app-services"
 import { useToast } from "@/hooks/use-toast"
 import { deleteAppService } from "@/hooks/use-app-services"
 import Swal from 'sweetalert2'
@@ -180,10 +181,23 @@ export default function AppServicesPage() {
                 key: 'is_active', 
                 header: 'Status', 
                 cell: (item) => (
-                  <Badge variant={item.is_active ? 'default' : 'secondary'} 
-                    className={item.is_active ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}>
-                    {item.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      checked={item.is_active}
+                      onCheckedChange={async (checked) => {
+                        try {
+                          await updateAppService(item.id, { is_active: checked })
+                          toast({ title: 'Success', description: 'Status updated successfully' })
+                          mutate()
+                        } catch (error) {
+                          toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+                        }
+                      }}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {item.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 )
               },
               { 

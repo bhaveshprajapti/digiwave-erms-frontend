@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Search, Eye, Edit, Trash2, Plus } from "lucide-react"
 import Link from "next/link"
 import { DataTable } from "@/components/common/data-table"
 import { ActionButtons } from "@/components/common/action-buttons"
 import { useToast } from "@/hooks/use-toast"
 import { ClientModal } from "./client-modal"
+import { ClientViewModal } from "./client-view-modal"
 import { ClientStats } from "./client-stats"
 import Swal from 'sweetalert2'
 import api from "@/lib/api"
@@ -41,8 +43,10 @@ export function ClientList() {
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add')
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+  const [viewClient, setViewClient] = useState<Client | null>(null)
   const { toast } = useToast()
   
   // Calculate stats
@@ -129,6 +133,48 @@ export function ClientList() {
   const handleRefresh = () => {
     fetchClients()
   }
+  
+  const handleViewClient = async (client: Client) => {
+    try {
+      // Fetch complete client details for viewing
+      const response = await api.get(`/clients/clients/${client.id}/`)
+      setViewClient(response.data)
+      setIsViewModalOpen(true)
+    } catch (error) {
+      console.error('Error fetching client details:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load client details",
+        variant: "destructive"
+      })
+    }
+  }
+  
+  const handleStatusToggle = async (client: Client, newStatus: boolean) => {
+    try {
+      await api.patch(`/clients/clients/${client.id}/`, { is_active: newStatus })
+      
+      // Update the local state
+      setClients(prevClients => 
+        prevClients.map(c => 
+          c.id === client.id ? { ...c, is_active: newStatus } : c
+        )
+      )
+      
+      toast({
+        title: "Success",
+        description: `Client ${newStatus ? 'activated' : 'deactivated'} successfully`,
+        variant: "success"
+      })
+    } catch (error) {
+      console.error('Error updating client status:', error)
+      toast({
+        title: "Error",
+        description: "Failed to update client status",
+        variant: "destructive"
+      })
+    }
+  }
 
   const filteredClients = clients.filter(
     (client) =>
@@ -183,9 +229,17 @@ export function ClientList() {
       <CardContent>
         <DataTable<Client>
           columns={[
+            { key: 'srno', header: 'Sr. No.', cell: (client, index) => (
+              <span className="font-medium text-gray-600">{((index || 0) + 1).toString().padStart(2, '0')}</span>
+            )},
             { key: 'client', header: 'Client', sortable: true, sortAccessor: (c)=>c.name, cell: (client) => (
               <div>
-                <div className="font-medium">{client.name}</div>
+                <button
+                  onClick={() => handleViewClient(client)}
+                  className="font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left"
+                >
+                  {client.name}
+                </button>
                 <div className="text-sm text-muted-foreground">{client.email}</div>
               </div>
             )},
@@ -208,12 +262,18 @@ export function ClientList() {
             )},
             { key: 'gst', header: 'GST Number', cell: (client) => client.gst_number || 'N/A' },
             { key: 'status', header: 'Status', cell: (client) => (
-              <Badge 
-                variant="outline" 
-                className={client.is_active !== false ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-50 text-gray-700 border-gray-200"}
-              >
-                {client.is_active !== false ? 'Active' : 'Inactive'}
-              </Badge>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={client.is_active !== false}
+                  onCheckedChange={(checked) => handleStatusToggle(client, checked)}
+                  size="sm"
+                />
+                <span className={`text-xs font-medium ${
+                  client.is_active !== false ? 'text-green-700' : 'text-gray-500'
+                }`}>
+                  {client.is_active !== false ? 'Active' : 'Inactive'}
+                </span>
+              </div>
             )},
             { key: 'created', header: 'Created', sortable: true, sortAccessor: (c)=>new Date(c.created_at).getTime(), cell: (c)=> new Date(c.created_at).toLocaleDateString() },
             { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (client) => (
@@ -228,7 +288,7 @@ export function ClientList() {
           data={filteredClients}
           getRowKey={(c)=>c.id.toString()}
           striped
-          pageSize={10}
+          pageSize={15}
           loading={loading}
           emptyText="No clients found"
         />
@@ -242,6 +302,23 @@ export function ClientList() {
       client={selectedClient}
       mode={modalMode}
       onSuccess={handleRefresh}
+    />
+    
+    {/* Client View Modal */}
+    <ClientViewModal
+      isOpen={isViewModalOpen}
+      onClose={() => setIsViewModalOpen(false)}
+      client={viewClient}
+      onStatusUpdate={(updatedClient, newStatus) => {
+        // Update the clients list with new status
+        setClients(prevClients => 
+          prevClients.map(c => 
+            c.id === updatedClient.id ? { ...c, is_active: newStatus } : c
+          )
+        )
+        // Update the view client state as well
+        setViewClient(prev => prev ? { ...prev, is_active: newStatus } : prev)
+      }}
     />
   </>
   )

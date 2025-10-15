@@ -45,13 +45,8 @@ export default function ShiftsPage() {
           tableColumns={[
             { key: 'sr', header: 'Sr No.', cell: (_item, i) => <span className="font-medium">{i + 1}</span>, className: 'w-16' },
             { key: 'name', header: 'Name', cell: (s) => <span className="font-medium">{s.name}</span> },
-{ key: 'time_range', header: 'Time', cell: (s) => (
-              <span className="text-sm">{formatTime12(s.start_time)} {formatTime12(s.end_time)}</span>
-            ) },
-            { key: 'is_active', header: 'Status', cell: (s) => (
-              <span className={`px-2 py-0.5 rounded text-xs ${s.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                {s.is_active ? 'Active' : 'Inactive'}
-              </span>
+            { key: 'time_range', header: 'Time', cell: (s) => (
+              <span className="text-sm">{formatTime12(s.start_time)} - {formatTime12(s.end_time)}</span>
             ) },
           ]}
           onAdd={handleAdd}

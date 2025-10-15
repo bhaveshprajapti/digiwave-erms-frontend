@@ -33,7 +33,7 @@ export default function EmployeeTypesPage() {
 
   const editMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: Partial<EmployeeType> }) =>
-      api.put(`/common/employee-types/${id}/`, data),
+      api.patch(`/common/employee-types/${id}/`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["employeeTypes"] })
       toast.success("Employee type updated successfully")

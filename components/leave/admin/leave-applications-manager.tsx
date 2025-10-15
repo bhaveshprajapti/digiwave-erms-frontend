@@ -199,24 +199,10 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     }
   }
 
-  // Admin can delete until the leave end date (inclusive). Block if already rejected/cancelled.
+  // Admin can delete any leave request regardless of status
   const canAdminDelete = (app: LeaveRequest) => {
-    const status = app.status as any
-    let isTerminal = false
-    
-    if (typeof status === 'string') {
-      const statusLower = status.toLowerCase()
-      isTerminal = statusLower === 'rejected' || statusLower === 'cancelled'
-    } else if (typeof status === 'number') {
-      isTerminal = status === 3 || status === 4
-    }
-    
-    if (isTerminal) return false
-
-    const today = new Date()
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-    const endDate = new Date(app.end_date + 'T00:00:00')
-    return endDate >= startOfToday
+    // Admin has full control - can delete any leave request
+    return true
   }
 
   const handleAdminDelete = async (app: any) => {
@@ -236,7 +222,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
     try {
       if (isFlexibleTiming) {
         await deleteFlexibleTimingRequest(app.id)
-        toast({ title: 'Deleted', description: 'Flexible timing request deleted successfully.' })
+        toast({ title: 'Success', description: 'Flexible timing request deleted successfully', variant: 'success' })
         // Refresh flexible timing requests
         const flexibleRequests = await getFlexibleTimingRequests()
         const typedRequests = flexibleRequests.map((req: any) => ({
@@ -253,7 +239,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
         setFlexibleTimingRequests(typedRequests)
       } else {
         await deleteLeaveRequest(app.id)
-        toast({ title: 'Deleted', description: 'Leave request deleted successfully.' })
+        toast({ title: 'Success', description: 'Leave request deleted successfully', variant: 'success' })
         // Remove from context and refresh
         removeRequest(app.id)
         await refreshAll()
@@ -288,7 +274,8 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
         await approveFlexibleTimingRequest(application.id)
         toast({
           title: "Success",
-          description: "Flexible timing request approved successfully"
+          description: "Flexible timing request approved successfully",
+          variant: "success"
         })
         // Refresh flexible timing requests
         const flexibleRequests = await getFlexibleTimingRequests()
@@ -308,7 +295,8 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
         await approveLeaveRequest(application.id, "")
         toast({
           title: "Success",
-          description: "Leave application approved successfully"
+          description: "Leave application approved successfully",
+          variant: "success"
         })
         // Update the request status in context and refresh
         updateRequest(application.id, { status: 2 as any })
@@ -342,7 +330,8 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
       await approveLeaveRequest(selectedApplication.id, actionComment)
       toast({
         title: "Success",
-        description: "Leave application approved successfully"
+        description: "Leave application approved successfully",
+        variant: "success"
       })
       setViewMode(null)
       setSelectedApplication(null)
@@ -380,7 +369,8 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
         await rejectFlexibleTimingRequest(selectedApplication.id, rejectionReason, actionComment)
         toast({
           title: "Success",
-          description: "Flexible timing request rejected successfully"
+          description: "Flexible timing request rejected successfully",
+          variant: "success"
         })
         // Refresh flexible timing requests
         const flexibleRequests = await getFlexibleTimingRequests()
@@ -400,7 +390,8 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
         await rejectLeaveRequest(selectedApplication.id, rejectionReason, actionComment)
         toast({
           title: "Success",
-          description: "Leave application rejected successfully"
+          description: "Leave application rejected successfully",
+          variant: "success"
         })
         // Update the request status in context and refresh
         updateRequest(selectedApplication.id, { status: 3 as any, rejection_reason: rejectionReason })
@@ -432,7 +423,8 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
       await loadComments(selectedApplication.id)
       toast({
         title: "Success",
-        description: "Comment added successfully"
+        description: "Comment added successfully",
+        variant: "success"
       })
     } catch (error: any) {
       toast({
@@ -626,34 +618,31 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
         
         return (
           <div className="flex items-center justify-center gap-2">
-            {isPending && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleApproveApplication(app)}
-                  className="text-green-600 border-green-200 hover:bg-green-50"
-                  disabled={processing}
-                >
-                  <CheckCircle className="h-4 w-4 mr-1" />
-                  Approve
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleRejectApplication(app)}
-                  className="text-red-600 border-red-200 hover:bg-red-50"
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  Reject
-                </Button>
-              </>
-            )}
-            {canDelete && (
-              <ActionButtons
-                onDelete={() => handleAdminDelete(app)}
-              />
-            )}
+            {/* Admin can always approve/reject regardless of current status */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleApproveApplication(app)}
+              className="text-green-600 border-green-200 hover:bg-green-50"
+              disabled={processing}
+            >
+              <CheckCircle className="h-4 w-4 mr-1" />
+              {(app.status === 2 || app.status === 'approved') ? 'Re-approve' : 'Approve'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleRejectApplication(app)}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <XCircle className="h-4 w-4 mr-1" />
+              {(app.status === 3 || app.status === 'rejected') ? 'Re-reject' : 'Reject'}
+            </Button>
+            {/* Admin can always delete/edit */}
+            <ActionButtons
+              onEdit={() => handleViewApplication(app)}
+              onDelete={() => handleAdminDelete(app)}
+            />
           </div>
         )
       }

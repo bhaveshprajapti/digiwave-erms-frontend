@@ -49,8 +49,8 @@ export async function createDesignation(data: { title: string; level: number; is
   return response.data
 }
 
-export async function updateDesignation(id: string, data: { title: string; level: number; is_active?: boolean }) {
-  const response = await api.put(`/common/designations/${id}/`, data)
+export async function updateDesignation(id: string, data: Partial<{ title: string; level: number; is_active: boolean }>) {
+  const response = await api.patch(`/common/designations/${id}/`, data)
   return response.data
 }
 

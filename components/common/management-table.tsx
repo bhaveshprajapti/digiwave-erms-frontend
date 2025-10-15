@@ -86,15 +86,29 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
   const validateField = (field: typeof fields[0], value: any): string => {
     // Skip validation for readonly fields
     if ((field as any).readonly) return ''
-    if ((field.type === 'text' || field.type === 'date') && (!value || value.toString().trim() === '')) {
+
+    // For text fields, check if value exists and is not empty after trimming
+    if (field.type === 'text') {
+      if (value === undefined || value === null || String(value).trim() === '') {
+        return `${field.label} is required`
+      }
+    }
+
+    // For date fields
+    if (field.type === 'date' && (!value || value.toString().trim() === '')) {
       return `${field.label} is required`
     }
+
+    // For time fields
     if (field.type === 'time' && (!value || value.toString().trim() === '')) {
       return `${field.label} is required`
     }
+
+    // For number fields
     if (field.type === 'number' && (value === undefined || value === '' || isNaN(Number(value)))) {
       return `${field.label} must be a valid number`
     }
+
     return ''
   }
 
@@ -125,19 +139,27 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
     const submitData = { ...formData }
     fields.forEach(field => {
       if ((field as any).readonly) return
-      if (submitData[field.key] === undefined || submitData[field.key] === '') {
+
+      // Handle different field types with proper defaults
+      if (submitData[field.key] === undefined || submitData[field.key] === null) {
         if (field.type === 'switch') {
           submitData[field.key] = (field.key === 'is_active' ? true : false) as any
         } else if (field.type === 'text') {
-          submitData[field.key] = '' as any
+          // Don't set empty string as default for text fields - let validation catch it
+          submitData[field.key] = undefined as any
         } else if (field.type === 'time') {
-          submitData[field.key] = '' as any // No default time
+          submitData[field.key] = undefined as any
         } else if (field.type === 'number') {
           submitData[field.key] = 0 as any
         }
       }
+
+      // Trim text fields
+      if (field.type === 'text' && submitData[field.key]) {
+        submitData[field.key] = String(submitData[field.key]).trim() as any
+      }
     })
-    
+
     try {
       await onAdd(submitData)
       setIsAddOpen(false)
@@ -172,11 +194,11 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
             if (typeof msg === 'string') newErrors[k] = msg
           })
           setErrors(prev => ({ ...prev, ...newErrors }))
-          if (newErrors['name']) {
-            description = newErrors['name']
+          if (newErrors['name'] || newErrors['title']) {
+            description = newErrors['name'] || newErrors['title']
           }
         }
-      } catch {}
+      } catch { }
       toast({
         title: "Error",
         description,
@@ -215,7 +237,7 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
           setErrors(prev => ({ ...prev, ...newErrors }))
           if (newErrors['name']) description = newErrors['name']
         }
-      } catch {}
+      } catch { }
       toast({
         title: "Error",
         description,
@@ -423,38 +445,38 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
             ...(Array.isArray(tableColumns) && tableColumns.length > 0
               ? tableColumns
               : fields.map((field) => ({
-                  key: String(field.key),
-                  header: field.label,
-                  sortable: field.type !== 'switch',
-                  cell: (item: T) => (
-                    field.type === 'switch' ? (
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={Boolean((item as any)[field.key])}
-                          onCheckedChange={async (checked) => {
-                            try {
-                              await onEdit((item as any).id, { [field.key]: checked } as Partial<T>)
-                              toast({ title: 'Success', description: 'Status updated successfully' })
-                            } catch (error) {
-                              toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
-                            }
-                          }}
-                        />
-                        <span className="text-sm text-muted-foreground">{Boolean((item as any)[field.key]) ? 'Active' : 'Inactive'}</span>
-                      </div>
-                    ) : (
-                      (() => {
-                        const v = (item as any)[field.key]
-                        if (field.type === 'select' && field.options) {
-                          const found = field.options.find(o => String(o.value) === String(v))
-                          return found ? found.label : String(v ?? '')
-                        }
-                        if (typeof v === 'boolean') return v ? 'Yes' : 'No'
-                        return String(v ?? '')
-                      })()
-                    )
+                key: String(field.key),
+                header: field.label,
+                sortable: field.type !== 'switch',
+                cell: (item: T) => (
+                  field.type === 'switch' ? (
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={Boolean((item as any)[field.key])}
+                        onCheckedChange={async (checked) => {
+                          try {
+                            await onEdit((item as any).id, { [field.key]: checked } as Partial<T>)
+                            toast({ title: 'Success', description: 'Status updated successfully' })
+                          } catch (error) {
+                            toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+                          }
+                        }}
+                      />
+                      <span className="text-sm text-muted-foreground">{Boolean((item as any)[field.key]) ? 'Active' : 'Inactive'}</span>
+                    </div>
+                  ) : (
+                    (() => {
+                      const v = (item as any)[field.key]
+                      if (field.type === 'select' && field.options) {
+                        const found = field.options.find(o => String(o.value) === String(v))
+                        return found ? found.label : String(v ?? '')
+                      }
+                      if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+                      return String(v ?? '')
+                    })()
                   )
-                }))),
+                )
+              }))),
             {
               key: 'actions',
               header: <span className="block text-center">Actions</span>,
