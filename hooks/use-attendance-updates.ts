@@ -5,7 +5,9 @@ import { useEffect, useCallback } from 'react'
 // Custom event types for attendance updates
 export const ATTENDANCE_EVENTS = {
   CHECK_IN: 'attendance:check-in',
-  CHECK_OUT: 'attendance:check-out',
+  START_BREAK: 'attendance:start-break',
+  END_BREAK: 'attendance:end-break',
+  END_OF_DAY: 'attendance:end-of-day',
   STATUS_UPDATE: 'attendance:status-update',
   REFRESH_NEEDED: 'attendance:refresh-needed'
 } as const
@@ -17,31 +19,34 @@ interface AttendanceEventDetail {
   date?: string
   sessionCount?: number
   totalHours?: string
-  type: 'check-in' | 'check-out' | 'status-update' | 'refresh'
+  dayStatus?: string
+  type: 'check-in' | 'start-break' | 'end-break' | 'end-of-day' | 'status-update' | 'refresh'
 }
 
 // Custom hook for listening to attendance updates
 export function useAttendanceUpdates(callback: () => void) {
   useEffect(() => {
-    const handleCheckIn = (event: CustomEvent<AttendanceEventDetail>) => {
-      console.log('Check-in event received:', event.detail)
+    const handleAttendanceEvent = (event: CustomEvent<AttendanceEventDetail>) => {
+      console.log('Attendance event received:', event.detail)
       // Add small delay to ensure backend has processed the data
       setTimeout(callback, 500)
     }
 
-    const handleCheckOut = (event: CustomEvent<AttendanceEventDetail>) => {
-      console.log('Check-out event received:', event.detail)
-      // Add small delay to ensure backend has processed the data
-      setTimeout(callback, 500)
-    }
-
-    // Only listen to check-in and check-out events
-    window.addEventListener(ATTENDANCE_EVENTS.CHECK_IN, handleCheckIn as EventListener)
-    window.addEventListener(ATTENDANCE_EVENTS.CHECK_OUT, handleCheckOut as EventListener)
+    // Listen to all attendance events
+    window.addEventListener(ATTENDANCE_EVENTS.CHECK_IN, handleAttendanceEvent as EventListener)
+    window.addEventListener(ATTENDANCE_EVENTS.START_BREAK, handleAttendanceEvent as EventListener)
+    window.addEventListener(ATTENDANCE_EVENTS.END_BREAK, handleAttendanceEvent as EventListener)
+    window.addEventListener(ATTENDANCE_EVENTS.END_OF_DAY, handleAttendanceEvent as EventListener)
+    window.addEventListener(ATTENDANCE_EVENTS.STATUS_UPDATE, handleAttendanceEvent as EventListener)
+    window.addEventListener(ATTENDANCE_EVENTS.REFRESH_NEEDED, handleAttendanceEvent as EventListener)
 
     return () => {
-      window.removeEventListener(ATTENDANCE_EVENTS.CHECK_IN, handleCheckIn as EventListener)
-      window.removeEventListener(ATTENDANCE_EVENTS.CHECK_OUT, handleCheckOut as EventListener)
+      window.removeEventListener(ATTENDANCE_EVENTS.CHECK_IN, handleAttendanceEvent as EventListener)
+      window.removeEventListener(ATTENDANCE_EVENTS.START_BREAK, handleAttendanceEvent as EventListener)
+      window.removeEventListener(ATTENDANCE_EVENTS.END_BREAK, handleAttendanceEvent as EventListener)
+      window.removeEventListener(ATTENDANCE_EVENTS.END_OF_DAY, handleAttendanceEvent as EventListener)
+      window.removeEventListener(ATTENDANCE_EVENTS.STATUS_UPDATE, handleAttendanceEvent as EventListener)
+      window.removeEventListener(ATTENDANCE_EVENTS.REFRESH_NEEDED, handleAttendanceEvent as EventListener)
     }
   }, [callback])
 }
@@ -62,8 +67,14 @@ export const attendanceEvents = {
   checkIn: (userId: number, sessionCount: number) => 
     dispatchAttendanceEvent(ATTENDANCE_EVENTS.CHECK_IN, { userId, sessionCount }),
   
-  checkOut: (userId: number, sessionCount: number, totalHours: string) => 
-    dispatchAttendanceEvent(ATTENDANCE_EVENTS.CHECK_OUT, { userId, sessionCount, totalHours }),
+  startBreak: (userId: number, sessionCount: number) => 
+    dispatchAttendanceEvent(ATTENDANCE_EVENTS.START_BREAK, { userId, sessionCount }),
+  
+  endBreak: (userId: number, sessionCount: number) => 
+    dispatchAttendanceEvent(ATTENDANCE_EVENTS.END_BREAK, { userId, sessionCount }),
+  
+  endOfDay: (userId: number, totalHours: string, dayStatus: string) => 
+    dispatchAttendanceEvent(ATTENDANCE_EVENTS.END_OF_DAY, { userId, totalHours, dayStatus }),
   
   statusUpdate: (userId: number, date: string) => 
     dispatchAttendanceEvent(ATTENDANCE_EVENTS.STATUS_UPDATE, { userId, date }),

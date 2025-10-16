@@ -10,7 +10,11 @@ import {
 } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Clock, Coffee, Play, User, Calendar } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Clock, Coffee, Play, User, Calendar, RefreshCw } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { adminResetDay } from "@/lib/api/attendances"
+import { attendanceEvents } from "@/hooks/use-attendance-updates"
 
 interface Session {
   id: string
@@ -39,6 +43,9 @@ export function EmployeeSessionModal({
   const [loading, setLoading] = useState(false)
   const [totalWorkTime, setTotalWorkTime] = useState(0)
   const [totalBreakTime, setTotalBreakTime] = useState(0)
+  const [isResetting, setIsResetting] = useState(false)
+  const [dayEnded, setDayEnded] = useState(false)
+  const { toast } = useToast()
 
   // Mock data generator for now - replace with actual API call
   const loadSessionData = async () => {
@@ -46,6 +53,12 @@ export function EmployeeSessionModal({
     try {
       // This would be replaced with actual API call
       // const sessionsData = await getEmployeeDaySessionsAPI(employeeId, date)
+      // For now, we'll simulate checking if day ended
+      // In real implementation, this would come from the API response
+      
+      // Mock check for day ended status (you would get this from API)
+      const mockDayEnded = Math.random() > 0.5 // 50% chance for demo
+      setDayEnded(mockDayEnded)
 
       // Mock data for demonstration
       const mockSessions: Session[] = [
@@ -138,6 +151,40 @@ export function EmployeeSessionModal({
     })
   }
 
+  const handleResetDay = async () => {
+    if (!employeeId || !selectedDate) return
+    
+    setIsResetting(true)
+    try {
+      await adminResetDay({
+        user_id: employeeId,
+        date: selectedDate
+      })
+      
+      toast({
+        title: "Success",
+        description: "Day status reset successfully. Employee can check in again.",
+      })
+      
+      // Dispatch event to refresh all attendance components
+      attendanceEvents.statusUpdate(employeeId, selectedDate)
+      
+      setDayEnded(false)
+      // Reload session data
+      await loadSessionData()
+      
+    } catch (error: any) {
+      console.error('Error resetting day:', error)
+      toast({
+        title: "Error",
+        description: error?.response?.data?.detail || "Failed to reset day status",
+        variant: "destructive",
+      })
+    } finally {
+      setIsResetting(false)
+    }
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
@@ -150,14 +197,29 @@ export function EmployeeSessionModal({
         }}
       >
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            {employeeName} - Session Details
-          </DialogTitle>
-          <DialogDescription className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            {formatDate(selectedDate)}
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                {employeeName} - Session Details
+              </DialogTitle>
+              <DialogDescription className="flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                {formatDate(selectedDate)}
+              </DialogDescription>
+            </div>
+            {dayEnded && (
+              <Button
+                onClick={handleResetDay}
+                disabled={isResetting}
+                size="sm"
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+              >
+                <RefreshCw className={`mr-2 h-4 w-4 ${isResetting ? 'animate-spin' : ''}`} />
+                {isResetting ? "Resetting..." : "Reset Day"}
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         {loading ? (
@@ -166,6 +228,21 @@ export function EmployeeSessionModal({
           </div>
         ) : (
           <div className="space-y-6">
+            {/* Day Status Alert */}
+            {dayEnded && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-orange-800">
+                    <Clock className="h-5 w-5" />
+                    <div>
+                      <p className="font-medium">Day has ended for this employee</p>
+                      <p className="text-sm">Use the "Reset Day" button to allow them to check in again.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Summary Cards - Same style as attendance page */}
             <div className="grid gap-4 md:grid-cols-3">
               <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-card to-muted/20">

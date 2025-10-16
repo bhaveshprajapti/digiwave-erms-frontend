@@ -7,9 +7,12 @@ export interface AttendanceDTO {
   date: string // YYYY-MM-DD
   sessions?: any
   total_hours?: string | null // HH:MM:SS
+  total_break_time?: string | null // HH:MM:SS
   location?: any
   notes?: string | null
   created_at?: string
+  attendance_status?: string
+  calendar_status?: string
 }
 
 const base = "/attendance/attendances/"
@@ -93,14 +96,19 @@ export interface CheckOutResponse {
 export interface AttendanceStatus {
   date: string
   is_checked_in: boolean
+  is_on_break: boolean
+  day_ended: boolean
   total_sessions: number
   completed_sessions: number
   total_hours: string
+  total_break_time: string
   last_check_in?: string
   last_check_out?: string
-  break_time: string
+  break_start_time?: string
+  day_end_time?: string
   is_on_leave: boolean
   attendance_status: string
+  calendar_status?: string
 }
 
 export const checkIn = async (data: CheckInData = {}): Promise<CheckInResponse> => {
@@ -108,8 +116,50 @@ export const checkIn = async (data: CheckInData = {}): Promise<CheckInResponse> 
   return res.data
 }
 
-export const checkOut = async (data: CheckInData = {}): Promise<CheckOutResponse> => {
-  const res: AxiosResponse<CheckOutResponse> = await api.post(`${base}check_out/`, data)
+export interface BreakResponse {
+  message: string
+  break_start_time?: string
+  check_in_time?: string
+  session_count: number
+  total_break_time?: string
+}
+
+export interface EndOfDayResponse {
+  message: string
+  end_time: string
+  total_hours: string
+  day_status: string
+  total_break_time: string
+}
+
+export const startBreak = async (data: CheckInData = {}): Promise<BreakResponse> => {
+  const res: AxiosResponse<BreakResponse> = await api.post(`${base}start_break/`, data)
+  return res.data
+}
+
+export const endBreak = async (data: CheckInData = {}): Promise<BreakResponse> => {
+  const res: AxiosResponse<BreakResponse> = await api.post(`${base}end_break/`, data)
+  return res.data
+}
+
+export const endOfDay = async (data: CheckInData = {}): Promise<EndOfDayResponse> => {
+  const res: AxiosResponse<EndOfDayResponse> = await api.post(`${base}end_of_day/`, data)
+  return res.data
+}
+
+export interface AdminResetDayData {
+  user_id: number
+  date: string // YYYY-MM-DD format
+}
+
+export interface AdminResetDayResponse {
+  message: string
+  date: string
+  user_id: number
+}
+
+export const adminResetDay = async (data: AdminResetDayData): Promise<AdminResetDayResponse> => {
+  const res: AxiosResponse<AdminResetDayResponse> = await api.post(`${base}admin_reset_day/`, data)
   return res.data
 }
 

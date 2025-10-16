@@ -24,7 +24,8 @@ export function AttendanceHistory() {
   const [end, setEnd] = useState<Date | undefined>()
   const [selectedAttendance, setSelectedAttendance] = useState<any>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
 
   const userId = useMemo(() => authService.getUserData()?.id, [])
 
@@ -54,13 +55,14 @@ export function AttendanceHistory() {
     load()
   }, [load])
 
-  // Listen for attendance updates - only check-in/check-out events
+  // Listen for all attendance updates
   useAttendanceUpdates(handleAttendanceEvent)
 
   // No automatic refresh - only update on events
 
   useEffect(() => { setPage(1) }, [start, end])
   useEffect(() => {
+    setIsMounted(true)
     load()
   }, [load])
 
@@ -104,12 +106,12 @@ export function AttendanceHistory() {
               sortable: true,
               cell: (r: any) => (
                 <div className="font-medium cursor-pointer hover:text-primary" onClick={() => handleViewDetails(r)}>
-                  {new Date(r.date).toLocaleDateString('en-US', {
+                  {isMounted ? new Date(r.date).toLocaleDateString('en-US', {
                     weekday: 'short',
                     month: 'short',
                     day: 'numeric',
                     year: 'numeric'
-                  })}
+                  }) : r.date}
                 </div>
               )
             },
@@ -135,6 +137,15 @@ export function AttendanceHistory() {
               cell: (r: any) => (
                 <div className="font-mono text-sm">
                   {r.total_hours || '0:00:00'}
+                </div>
+              )
+            },
+            {
+              key: 'total_break_time',
+              header: 'Break Time',
+              cell: (r: any) => (
+                <div className="font-mono text-sm text-orange-600">
+                  {r.total_break_time || '0:00:00'}
                 </div>
               )
             },
@@ -218,7 +229,7 @@ export function AttendanceHistory() {
                 <span>Updating...</span>
               </div>
             )}
-            {!loading && lastRefresh && (
+            {!loading && lastRefresh && isMounted && (
               <div className="text-xs text-muted-foreground">
                 Last updated: {lastRefresh.toLocaleTimeString()}
               </div>

@@ -8,6 +8,7 @@ import { SessionDetailsModal } from "./session-details-modal"
 import { listAttendances } from "@/lib/api/attendances"
 import { authService } from "@/lib/auth"
 import { calculateAttendanceStatus, clearAttendanceStatusCache } from "@/lib/utils/attendance-status"
+import { useAttendanceUpdates } from "@/hooks/use-attendance-updates"
 
 export function AttendanceCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -30,62 +31,72 @@ export function AttendanceCalendar() {
     }
   }, [currentDate, userId])
 
+  // Listen for attendance updates and refresh calendar
+  useAttendanceUpdates(() => {
+    if (userId) {
+      console.log('Calendar: Attendance event received - refreshing data')
+      loadAttendanceData()
+    }
+  })
+
   const loadAttendanceData = async () => {
     if (!userId) return
-    
+
     setLoading(true)
     try {
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth()
       const startDate = new Date(year, month, 1).toISOString().slice(0, 10)
       const endDate = new Date(year, month + 1, 0).toISOString().slice(0, 10)
-      
+
       const data = await listAttendances({
         user: userId,
         start_date: startDate,
         end_date: endDate,
       })
-      
+
       const attendanceMap: Record<string, any> = {}
-      
-      // Process each attendance record with proper status calculation
+
+      // Process each attendance record using backend status
       for (const record of data.results) {
         const sessions = record.sessions || []
-        
-        try {
-          // Use the new attendance status calculation
-          const statusResult = await calculateAttendanceStatus(
-            sessions,
-            record.date,
-            record.total_hours,
-            false // TODO: Check if user is on leave for this date
-          )
-          
-          attendanceMap[record.date] = {
-            status: statusResult.status,
-            reason: statusResult.reason,
-            sessions,
-            total_hours: record.total_hours,
-            notes: record.notes
+
+        // Use backend calculated status - prefer calendar_status if available, fallback to attendance_status
+        let status = "absent"
+        const backendStatus = record.calendar_status || record.attendance_status
+
+        if (backendStatus) {
+          // Map backend status to calendar status
+          switch (backendStatus.toLowerCase()) {
+            case 'present':
+            case 'active':
+              status = "present"
+              break
+            case 'half day':
+            case 'half-day':
+              status = "half-day"
+              break
+            case 'on leave':
+              status = "leave"
+              break
+            case 'absent':
+            default:
+              status = "absent"
+              break
           }
-        } catch (error) {
-          console.error(`Error calculating status for ${record.date}:`, error)
-          // Fallback to basic calculation
-          let status = "absent"
-          if (sessions.length > 0) {
-            const hasActiveSession = sessions.some((s: any) => !s.check_out)
-            status = hasActiveSession ? "present" : "present"
-          }
-          
-          attendanceMap[record.date] = {
-            status,
-            sessions,
-            total_hours: record.total_hours,
-            notes: record.notes
-          }
+        } else if (sessions.length > 0) {
+          // Fallback: if has sessions, show as present
+          status = "present"
+        }
+
+        attendanceMap[record.date] = {
+          status,
+          sessions,
+          total_hours: record.total_hours,
+          notes: record.notes
         }
       }
-      
+
       setAttendanceData(attendanceMap)
     } catch (error) {
       console.error('Error loading attendance data:', error)
@@ -157,7 +168,7 @@ export function AttendanceCalendar() {
                 <div key={day} className="p-1">{day}</div>
               ))}
             </div>
-            
+
             {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-1">
               {Array.from({ length: firstDay }).map((_, i) => (
@@ -169,21 +180,19 @@ export function AttendanceCalendar() {
                 const attendanceInfo = attendanceData[dateStr]
                 const hasData = !!attendanceInfo
                 const today = new Date().toISOString().slice(0, 10) === dateStr
-                
+
                 return (
                   <div
                     key={day}
                     className={`
                       relative flex h-8 items-center justify-center rounded text-xs font-medium transition-colors
-                      ${
-                        hasData 
-                          ? "cursor-pointer hover:bg-muted border hover:border-primary/50 bg-muted/20" 
-                          : "text-muted-foreground"
+                      ${hasData
+                        ? "cursor-pointer hover:bg-muted border hover:border-primary/50 bg-muted/20"
+                        : "text-muted-foreground"
                       }
-                      ${
-                        today 
-                          ? "ring-1 ring-primary ring-offset-1" 
-                          : ""
+                      ${today
+                        ? "ring-1 ring-primary ring-offset-1"
+                        : ""
                       }
                     `}
                     onClick={() => hasData && handleDateClick(dateStr)}
@@ -202,7 +211,7 @@ export function AttendanceCalendar() {
                 )
               })}
             </div>
-            
+
             {/* Legend */}
             <div className="flex flex-wrap gap-2 pt-2 text-xs border-t">
               <div className="flex items-center gap-1">
@@ -229,13 +238,15 @@ export function AttendanceCalendar() {
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Session Details Modal */}
-      <SessionDetailsModal 
-        isOpen={modalOpen}
-        onClose={() => setModalOpen(false)}
-        selectedDate={selectedDate}
-        userId={userId}
+      <SessionDetailsModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        attendance={selectedDate ? {
+          date: selectedDate,
+          ...attendanceData[selectedDate]
+        } : null}
       />
     </>
   )
