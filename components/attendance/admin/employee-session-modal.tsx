@@ -46,7 +46,7 @@ export function EmployeeSessionModal({
     try {
       // This would be replaced with actual API call
       // const sessionsData = await getEmployeeDaySessionsAPI(employeeId, date)
-      
+
       // Mock data for demonstration
       const mockSessions: Session[] = [
         {
@@ -57,7 +57,7 @@ export function EmployeeSessionModal({
           duration: 210, // 3.5 hours
         },
         {
-          id: "2", 
+          id: "2",
           clockIn: new Date(`${selectedDate} 12:30:00`),
           clockOut: new Date(`${selectedDate} 13:30:00`),
           type: "break",
@@ -67,7 +67,7 @@ export function EmployeeSessionModal({
           id: "3",
           clockIn: new Date(`${selectedDate} 13:30:00`),
           clockOut: new Date(`${selectedDate} 17:00:00`),
-          type: "work", 
+          type: "work",
           duration: 210, // 3.5 hours
         },
         {
@@ -85,17 +85,17 @@ export function EmployeeSessionModal({
           duration: 75, // 1.25 hours
         },
       ]
-      
+
       setSessions(mockSessions)
-      
+
       const workTime = mockSessions
         .filter(s => s.type === "work")
         .reduce((total, session) => total + session.duration, 0)
-      
+
       const breakTime = mockSessions
-        .filter(s => s.type === "break") 
+        .filter(s => s.type === "break")
         .reduce((total, session) => total + session.duration, 0)
-      
+
       setTotalWorkTime(workTime)
       setTotalBreakTime(breakTime)
     } catch (error) {
@@ -124,7 +124,7 @@ export function EmployeeSessionModal({
     const hours = Math.floor(minutes / 60)
     const mins = Math.floor(minutes % 60)
     const secs = Math.floor((minutes % 1) * 60) // Extract seconds from decimal part
-    
+
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
@@ -132,7 +132,7 @@ export function EmployeeSessionModal({
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
-      year: 'numeric', 
+      year: 'numeric',
       month: 'long',
       day: 'numeric'
     })
@@ -140,12 +140,12 @@ export function EmployeeSessionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
-        className="!max-w-none !w-[75vw] !h-[85vh] max-h-none overflow-y-auto p-6 sm:!max-w-none" 
-        style={{ 
-          width: '85vw', 
-          height: '85vh', 
-          maxWidth: 'none', 
+      <DialogContent
+        className="!max-w-none !w-[75vw] !h-[85vh] max-h-none overflow-y-auto p-6 sm:!max-w-none"
+        style={{
+          width: '85vw',
+          height: '85vh',
+          maxWidth: 'none',
           maxHeight: 'none'
         }}
       >
@@ -226,11 +226,10 @@ export function EmployeeSessionModal({
                     {sessions.map((session, index) => (
                       <div key={session.id} className="flex items-center gap-4">
                         <div className="flex flex-col items-center">
-                          <div className={`p-2 rounded-full ${
-                            session.type === 'work' 
-                              ? 'bg-blue-100 text-blue-600' 
-                              : 'bg-orange-100 text-orange-600'
-                          }`}>
+                          <div className={`p-2 rounded-full ${session.type === 'work'
+                            ? 'bg-blue-100 text-blue-600'
+                            : 'bg-orange-100 text-orange-600'
+                            }`}>
                             {session.type === 'work' ? (
                               <Play className="h-4 w-4" />
                             ) : (
@@ -246,7 +245,7 @@ export function EmployeeSessionModal({
                           <div className="flex items-center justify-between">
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
-                                <Badge 
+                                <Badge
                                   variant={session.type === 'work' ? 'default' : 'secondary'}
                                   className="text-xs"
                                 >
@@ -280,7 +279,7 @@ export function EmployeeSessionModal({
                     <div>
                       <div className="text-sm text-muted-foreground">Work vs Break Ratio</div>
                       <div className="text-lg font-semibold">
-                        {totalWorkTime > 0 && totalBreakTime > 0 
+                        {totalWorkTime > 0 && totalBreakTime > 0
                           ? `${Math.round(totalWorkTime / totalBreakTime * 10) / 10}:1`
                           : 'N/A'
                         }
@@ -292,7 +291,7 @@ export function EmployeeSessionModal({
                     <div>
                       <div className="text-sm text-muted-foreground">Average Session Length</div>
                       <div className="text-lg font-semibold">
-                        {sessions.length > 0 
+                        {sessions.length > 0
                           ? formatDuration(Math.round((totalWorkTime + totalBreakTime) / sessions.length))
                           : 'N/A'
                         }
