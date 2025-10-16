@@ -10,10 +10,7 @@ import {
 } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Button } from "@/components/ui/button"
-import { Clock, Coffee, Play, Pause, User, Calendar } from "lucide-react"
-import api from "@/lib/api"
+import { Clock, Coffee, Play, User, Calendar } from "lucide-react"
 
 interface Session {
   id: string
@@ -29,7 +26,6 @@ interface EmployeeSessionModalProps {
   employeeName: string
   employeeId: number
   selectedDate: string
-  onDateChange: (date: string) => void
 }
 
 export function EmployeeSessionModal({
@@ -38,7 +34,6 @@ export function EmployeeSessionModal({
   employeeName,
   employeeId,
   selectedDate,
-  onDateChange,
 }: EmployeeSessionModalProps) {
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(false)

@@ -149,6 +149,10 @@
   .animate-progressive-fill {
     animation: progressiveFill 3s ease-in-out infinite;
   }
+  
+  .animate-progressive-fill-yellow {
+    animation: progressiveFillYellow 3s ease-in-out infinite;
+  }
 }
 
 @keyframes bounceGentle {
@@ -192,5 +196,17 @@
   }
   100% {
     background: linear-gradient(90deg, rgba(16, 185, 129, 0.08) 0%, transparent 0%, transparent 100%);
+  }
+}
+
+@keyframes progressiveFillYellow {
+  0% {
+    background: linear-gradient(90deg, rgba(234, 179, 8, 0.08) 0%, transparent 0%, transparent 100%);
+  }
+  50% {
+    background: linear-gradient(90deg, rgba(234, 179, 8, 0.08) 0%, rgba(234, 179, 8, 0.04) 60%, transparent 100%);
+  }
+  100% {
+    background: linear-gradient(90deg, rgba(234, 179, 8, 0.08) 0%, transparent 0%, transparent 100%);
   }
 }

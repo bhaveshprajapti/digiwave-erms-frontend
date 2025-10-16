@@ -100,6 +100,7 @@ export interface AttendanceStatus {
   last_check_out?: string
   break_time: string
   is_on_leave: boolean
+  attendance_status: string
 }
 
 export const checkIn = async (data: CheckInData = {}): Promise<CheckInResponse> => {

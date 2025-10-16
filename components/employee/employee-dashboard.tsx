@@ -16,7 +16,8 @@ import {
   LogIn,
   LogOut,
   Timer,
-  MapPin
+  MapPin,
+  Coffee
 } from "lucide-react"
 import authService from "@/lib/auth"
 import api from "@/lib/api"
@@ -24,6 +25,7 @@ import { useToast } from "@/hooks/use-toast"
 import { checkIn, checkOut, getAttendanceStatus, AttendanceStatus } from "@/lib/api/attendances"
 import { getMyLeaveApplications } from "@/lib/api/leave-requests"
 import { Button } from "@/components/ui/button"
+import { attendanceEvents } from "@/hooks/use-attendance-updates"
 
 export function EmployeeDashboard() {
   const { toast } = useToast()
@@ -42,6 +44,9 @@ export function EmployeeDashboard() {
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [userShifts, setUserShifts] = useState<any[]>([])
+  const [breakStartTime, setBreakStartTime] = useState<Date | null>(null)
+  const [liveBreakTime, setLiveBreakTime] = useState<string>("0:00:00")
+  const [shiftsData, setShiftsData] = useState<any[]>([]) // Cache shift data
 
   const loadDashboardData = async () => {
     const userData = authService.getUserData()
@@ -217,15 +222,21 @@ export function EmployeeDashboard() {
     }
   }
 
-  // Load user profile with shifts
+  // Load user profile with shifts and cache shift data
   const loadUserProfile = async () => {
     const userData = authService.getUserData()
     if (!userData?.id) return
     
     try {
-      const response = await api.get(`/accounts/users/${userData.id}/`)
-      const fullUser = response.data
+      const [userResponse, shiftsResponse] = await Promise.all([
+        api.get(`/accounts/users/${userData.id}/`),
+        api.get('/common/shifts/')
+      ])
+      
+      const fullUser = userResponse.data
       setUserShifts(fullUser.shifts || [])
+      setShiftsData(shiftsResponse.data || [])
+      console.log('User profile and shifts loaded once in dashboard')
     } catch (error) {
       console.error('Error loading user profile:', error)
     }
@@ -241,6 +252,19 @@ export function EmployeeDashboard() {
       const totalHours = status.total_hours || "0:00:00"
       const cleanTime = totalHours.split('.')[0]
       setLiveWorkingTime(cleanTime)
+
+      // Check if user has sessions today and is on break
+      if (!status.is_checked_in && (status.total_sessions || 0) > 0 && (status.completed_sessions || 0) > 0 && status.last_check_out) {
+        // User is on break - set break start time from last check out
+        const lastCheckOut = new Date(status.last_check_out)
+        setBreakStartTime(lastCheckOut)
+        
+        // Store break start time in localStorage for persistence
+        localStorage.setItem('breakStartTime', lastCheckOut.toISOString())
+      } else if (status.is_checked_in) {
+        setBreakStartTime(null)
+        localStorage.removeItem('breakStartTime')
+      }
     } catch (error: any) {
       console.error('Error loading attendance status:', error)
     }
@@ -268,6 +292,32 @@ export function EmployeeDashboard() {
     })
   }
 
+  // Check if current time is after shift end (for break timer) - using cached data
+  const isAfterShiftEnd = () => {
+    if (userShifts.length === 0 || shiftsData.length === 0) return false
+
+    try {
+      const now = new Date()
+      const currentTime = now.getHours() * 60 + now.getMinutes()
+
+      for (const shiftId of userShifts) {
+        const shift = shiftsData.find((s: any) => s.id === shiftId)
+        if (!shift) continue
+
+        const [endHour, endMin] = shift.end_time.split(':').map(Number)
+        const endTime = endHour * 60 + endMin
+
+        // If current time is after shift end, stop break timer
+        if (currentTime > endTime) {
+          return true
+        }
+      }
+      return false
+    } catch (error) {
+      return false
+    }
+  }
+
   // Validate if current time is within shift hours
   const validateShiftTiming = async () => {
     if (userShifts.length === 0) {
@@ -276,9 +326,14 @@ export function EmployeeDashboard() {
     }
 
     try {
-      // Fetch shift details
-      const shiftsResponse = await api.get('/common/shifts/')
-      const allShifts = shiftsResponse.data || []
+      // Use cached shift details or fetch once if not available
+      let allShifts = shiftsData
+      if (allShifts.length === 0) {
+        const shiftsResponse = await api.get('/common/shifts/')
+        allShifts = shiftsResponse.data || []
+        setShiftsData(allShifts)
+        console.log('Shifts data loaded once for validation in dashboard')
+      }
       
       const now = new Date()
       const currentTime = now.getHours() * 60 + now.getMinutes() // Current time in minutes
@@ -294,16 +349,19 @@ export function EmployeeDashboard() {
         let startTime = startHour * 60 + startMin
         let endTime = endHour * 60 + endMin
         
+        // Allow check-in from 9 AM or 15 minutes after shift start
+        const graceStart = Math.min(9 * 60, startTime + 15) // 9 AM or shift start + 15 min
+        
         // Handle overnight shifts (e.g., 22:00 - 07:00)
         if (endTime < startTime) {
           // This is an overnight shift - spans across midnight
-          // Check if current time is after start (same day) OR before end (next day)
-          if (currentTime >= startTime || currentTime <= endTime) {
+          // Check if current time is after grace start (same day) OR before end (next day)
+          if (currentTime >= graceStart || currentTime <= endTime) {
             return { allowed: true, message: '' }
           }
         } else {
-          // For regular shifts, check if current time is between start and end
-          if (currentTime >= startTime && currentTime <= endTime) {
+          // For regular shifts, check if current time is between grace start and end
+          if (currentTime >= graceStart && currentTime <= endTime) {
             return { allowed: true, message: '' }
           }
         }
@@ -314,13 +372,13 @@ export function EmployeeDashboard() {
       if (shift) {
         return {
           allowed: false,
-          message: `Check-in only allowed during shift hours: ${shift.start_time} - ${shift.end_time}`
+          message: `Check-in allowed from 9 AM or up to 15 minutes after shift start. Shift hours: ${shift.start_time} - ${shift.end_time}`
         }
       }
       
       return {
         allowed: false,
-        message: 'Check-in not allowed outside shift hours'
+        message: 'Check-in allowed from 9 AM or up to 15 minutes after shift start'
       }
     } catch (error) {
       console.error('Error validating shift timing:', error)
@@ -422,6 +480,10 @@ export function EmployeeDashboard() {
       const locationData = location || { lat: 0, lng: 0 }
       const response = await checkIn({ location: locationData })
       
+      // Clear break time
+      setBreakStartTime(null)
+      localStorage.removeItem('breakStartTime')
+      
       toast({
         title: "Success", 
         description: `Checked in successfully! Session ${response.session_count}`,
@@ -429,6 +491,12 @@ export function EmployeeDashboard() {
       
       await loadAttendanceStatus()
       await loadDashboardData() // Refresh activity feed
+
+      // Dispatch event for real-time updates
+      const userData = authService.getUserData()
+      if (userData?.id) {
+        attendanceEvents.checkIn(userData.id, response.session_count)
+      }
       
     } catch (error: any) {
       console.error('Check-out error:', error)
@@ -450,13 +518,24 @@ export function EmployeeDashboard() {
       const locationData = location || { lat: 0, lng: 0 }
       const response = await checkOut({ location: locationData })
       
+      // Set break start time
+      const now = new Date()
+      setBreakStartTime(now)
+      localStorage.setItem('breakStartTime', now.toISOString())
+      
       toast({
         title: "Success",
-        description: `Checked out successfully! Total time: ${response.total_hours}`,
+        description: `Checked out successfully! Break time started. Total time: ${response.total_hours}`,
       })
       
       await loadAttendanceStatus()
       await loadDashboardData() // Refresh activity feed
+
+      // Dispatch event for real-time updates
+      const userData = authService.getUserData()
+      if (userData?.id) {
+        attendanceEvents.checkOut(userData.id, response.session_count, response.total_hours)
+      }
       
     } catch (error: any) {
       console.error('Check-out error:', error)
@@ -482,6 +561,7 @@ export function EmployeeDashboard() {
     return false // For now, let the backend validation handle it
   }
 
+  // Initial setup effect - runs only once
   useEffect(() => {
     const u = authService.getUserData()
     if (u) {
@@ -493,15 +573,58 @@ export function EmployeeDashboard() {
       // Get location
       getUserLocation().then(setLocation)
       
-      // Setup timer for current time
-      setCurrentTime(new Date())
-      const timer = setInterval(() => {
-        setCurrentTime(new Date())
-      }, 1000)
-      
-      return () => clearInterval(timer)
+      // Restore break start time from localStorage if exists
+      const storedBreakTime = localStorage.getItem('breakStartTime')
+      if (storedBreakTime) {
+        setBreakStartTime(new Date(storedBreakTime))
+      }
     }
-  }, [])
+  }, []) // Empty dependency array - runs only once
+
+  // Separate timer effect for current time and break time
+  useEffect(() => {
+    setCurrentTime(new Date())
+    const timer = setInterval(() => {
+      const now = new Date()
+      setCurrentTime(now)
+      
+      // Calculate live break time if on break and within shift hours
+      if (breakStartTime && !attendanceStatus?.is_checked_in && (attendanceStatus?.total_sessions || 0) > 0) {
+        // Check if we're still within shift hours using cached data
+        const afterShift = isAfterShiftEnd()
+        if (afterShift) {
+          // Stop break timer after shift end
+          setBreakStartTime(null)
+          localStorage.removeItem('breakStartTime')
+          return
+        }
+        
+        const breakDuration = now.getTime() - breakStartTime.getTime()
+        
+        // Parse existing break time from backend
+        const existingBreakStr = attendanceStatus?.break_time || "0:00:00"
+        const breakParts = existingBreakStr.split(":")
+        const existingHours = parseInt(breakParts[0]) || 0
+        const existingMinutes = parseInt(breakParts[1]) || 0
+        const existingSeconds = parseFloat(breakParts[2]) || 0
+        const existingBreakMs = (existingHours * 3600 + existingMinutes * 60 + existingSeconds) * 1000
+        
+        const totalBreakMs = existingBreakMs + breakDuration
+        const hours = Math.floor(totalBreakMs / (1000 * 60 * 60))
+        const minutes = Math.floor((totalBreakMs % (1000 * 60 * 60)) / (1000 * 60))
+        const seconds = Math.floor((totalBreakMs % (1000 * 60)) / 1000)
+        
+        setLiveBreakTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
+      } else {
+        // Use static break time when not on break
+        const breakTime = attendanceStatus?.break_time || "0:00:00"
+        const cleanBreakTime = breakTime.split('.')[0]
+        setLiveBreakTime(cleanBreakTime)
+      }
+    }, 1000)
+    
+    return () => clearInterval(timer)
+  }, [breakStartTime, attendanceStatus?.break_time, attendanceStatus?.is_checked_in, attendanceStatus?.total_sessions])
 
 
   if (!user || loading) {
@@ -534,9 +657,13 @@ export function EmployeeDashboard() {
           </div>
           <div className="text-right flex items-center space-x-4">
             <button
-              onClick={() => loadDashboardData()}
+              onClick={() => {
+                loadDashboardData()
+                loadAttendanceStatus()
+              }}
               className="flex items-center gap-2 px-3 py-2 text-sm bg-background hover:bg-muted rounded-md transition-colors"
               disabled={loading}
+              title="Refresh dashboard data"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Refresh
@@ -557,48 +684,84 @@ export function EmployeeDashboard() {
       </div>
 
       {/* Quick Attendance Widget */}
-      <Card className={`border-l-4 bg-gradient-to-br from-card to-muted/20 transition-all duration-500 ${
+      <Card className={`border-l-4 bg-gradient-to-br from-card to-muted/20 transition-all duration-500 relative overflow-hidden ${
         attendanceStatus?.is_checked_in 
           ? 'border-l-green-500 ring-1 ring-green-500/20 shadow-md'
+          : breakStartTime && !attendanceStatus?.is_checked_in && (attendanceStatus?.total_sessions || 0) > 0
+          ? 'border-l-yellow-500 ring-1 ring-yellow-500/20 shadow-md'
           : 'border-l-blue-500'
       }`}>
-        <CardHeader>
+        {/* Background effect for checked in state */}
+        {attendanceStatus?.is_checked_in && (
+          <div className="absolute inset-0 animate-progressive-fill" />
+        )}
+        {/* Background effect for break state */}
+        {breakStartTime && !attendanceStatus?.is_checked_in && (attendanceStatus?.total_sessions || 0) > 0 && (
+          <div className="absolute inset-0 animate-progressive-fill-yellow" />
+        )}
+        <CardHeader className="relative z-10">
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Timer className="h-5 w-5" />
               Quick Attendance
             </div>
             {attendanceStatus?.is_checked_in && (
-              <div className="flex items-center gap-2 text-sm text-green-600">
-                <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+              <div className="flex items-center gap-2 text-sm text-green-800">
+                <div className="h-2 w-2 bg-green-700 rounded-full animate-pulse" />
                 Active Session
+              </div>
+            )}
+            {breakStartTime && !attendanceStatus?.is_checked_in && (attendanceStatus?.total_sessions || 0) > 0 && (
+              <div className="flex items-center gap-2 text-sm text-yellow-600">
+                <div className="h-2 w-2 bg-yellow-500 rounded-full animate-pulse" />
+                Break Time Started
               </div>
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative z-10">
           <div className="flex items-center justify-between gap-4">
             {/* Timer Display - Left Side */}
             <div className="flex items-center gap-4">
               <div className={`h-16 w-16 rounded-xl flex items-center justify-center transition-all duration-300 ${
                 attendanceStatus?.is_checked_in 
                   ? 'bg-green-100 shadow-md' 
+                  : breakStartTime && !attendanceStatus?.is_checked_in && (attendanceStatus?.total_sessions || 0) > 0
+                  ? 'bg-yellow-100 shadow-md'
                   : 'bg-blue-100 shadow-sm'
               }`}>
-                <Timer className={`h-8 w-8 transition-colors duration-300 ${
-                  attendanceStatus?.is_checked_in ? 'text-green-600' : 'text-blue-600'
-                }`} />
+                {breakStartTime && !attendanceStatus?.is_checked_in && (attendanceStatus?.total_sessions || 0) > 0 ? (
+                  <Coffee className="h-8 w-8 text-yellow-600 animate-pulse" />
+                ) : (
+                  <Timer className={`h-8 w-8 transition-colors duration-300 ${
+                    attendanceStatus?.is_checked_in ? 'text-green-600' : 'text-blue-600'
+                  }`} />
+                )}
               </div>
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Today's Working Time</p>
-                <p className={`text-2xl font-bold font-mono tracking-wide transition-colors duration-300 ${
-                  attendanceStatus?.is_checked_in ? 'text-green-600' : 'text-blue-600'
-                }`}>
-                  {liveWorkingTime}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {attendanceStatus?.is_checked_in ? "Live timer running" : "Total for today"}
-                </p>
+                {breakStartTime && !attendanceStatus?.is_checked_in && (attendanceStatus?.total_sessions || 0) > 0 ? (
+                  <>
+                    <p className="text-sm font-medium text-muted-foreground">Break Time</p>
+                    <p className="text-2xl font-bold font-mono tracking-wide text-yellow-600 transition-colors duration-300">
+                      {liveBreakTime}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Live break timer running
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-muted-foreground">Today's Working Time</p>
+                    <p className={`text-2xl font-bold font-mono tracking-wide transition-colors duration-300 ${
+                      attendanceStatus?.is_checked_in ? 'text-green-600' : 'text-blue-600'
+                    }`}>
+                      {liveWorkingTime}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {attendanceStatus?.is_checked_in ? "Live timer running" : "Total for today"}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
             
@@ -629,7 +792,7 @@ export function EmployeeDashboard() {
           </div>
           
           {/* Additional Info Row */}
-          <div className="mt-4 pt-4 border-t border-muted flex items-center justify-between text-sm text-muted-foreground">
+          <div className="mt-4 pt-4 border-t border-muted flex items-center justify-between text-sm text-muted-foreground relative z-10">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               <span>{currentTime?.toLocaleTimeString() || "--:--:--"}</span>
