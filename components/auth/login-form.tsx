@@ -191,7 +191,13 @@ export function LoginForm() {
               {error}
             </div>
           )}
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className={[
+                "w-full text-white font-medium",
+                "rounded-lg shadow-md hover:shadow-lg transition",
+                "hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                "[background:linear-gradient(90deg,#60A5FA_0%,#2563EB_100%)]",
+                "focus-visible:ring-[#3B82F6]",
+              ].join(" ")} disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
           </Button>
         </form>

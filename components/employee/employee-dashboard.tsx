@@ -26,6 +26,57 @@ import { checkIn, startBreak, endBreak, endOfDay, getAttendanceStatus, Attendanc
 import { getMyLeaveApplications } from "@/lib/api/leave-requests"
 import { Button } from "@/components/ui/button"
 import { attendanceEvents } from "@/hooks/use-attendance-updates"
+import Swal from 'sweetalert2'
+
+// Helper functions for secure user-specific localStorage
+const getUserSpecificKey = (key: string) => {
+  const userData = authService.getUserData()
+  const userId = userData?.id
+  if (!userId) return null
+  return `${key}_user_${userId}`
+}
+
+const setUserSpecificStorage = (key: string, value: string) => {
+  const userKey = getUserSpecificKey(key)
+  if (userKey) {
+    localStorage.setItem(userKey, value)
+  }
+}
+
+const getUserSpecificStorage = (key: string) => {
+  const userKey = getUserSpecificKey(key)
+  if (userKey) {
+    return localStorage.getItem(userKey)
+  }
+  return null
+}
+
+const removeUserSpecificStorage = (key: string) => {
+  const userKey = getUserSpecificKey(key)
+  if (userKey) {
+    localStorage.removeItem(userKey)
+  }
+}
+
+const clearUserSpecificStorage = () => {
+  const userData = authService.getUserData()
+  const userId = userData?.id
+  if (!userId) return
+  
+  // Only clear stale data (from previous days), not current day data
+  const storedBreakTime = getUserSpecificStorage('breakStartTime')
+  if (storedBreakTime) {
+    const storedDate = new Date(storedBreakTime).toDateString()
+    const today = new Date().toDateString()
+    if (storedDate !== today) {
+      removeUserSpecificStorage('breakStartTime')
+      console.log('Cleared stale break time from previous day')
+    }
+  }
+  
+  // Also clear any old non-user-specific keys for cleanup
+  localStorage.removeItem('breakStartTime')
+}
 
 export function EmployeeDashboard() {
   // Helper function to format duration to HH:MM:SS with proper padding
@@ -64,6 +115,29 @@ export function EmployeeDashboard() {
   const getISTHour = () => {
     const ist = getCurrentIST()
     return ist.getHours()
+  }
+
+  // Helper function to get appropriate color for attendance status
+  const getStatusColor = (status?: string) => {
+    if (!status) return "text-muted-foreground"
+    
+    switch (status.toLowerCase()) {
+      case 'present':
+      case 'active':
+        return "text-green-600 font-medium"
+      case 'half day':
+        return "text-yellow-600 font-medium"
+      case 'absent':
+        return "text-red-600 font-medium"
+      case 'on leave':
+        return "text-blue-600 font-medium"
+      case 'present (despite leave)':
+        return "text-green-700 font-medium"
+      case 'half day (despite leave)':
+        return "text-yellow-700 font-medium"
+      default:
+        return "text-muted-foreground"
+    }
   }
   const { toast } = useToast()
   const [user, setUser] = useState<any>(null)
@@ -294,10 +368,10 @@ export function EmployeeDashboard() {
       if (status.is_on_break && status.break_start_time) {
         const breakStart = new Date(status.break_start_time)
         setBreakStartTime(breakStart)
-        localStorage.setItem('breakStartTime', breakStart.toISOString())
+        setUserSpecificStorage('breakStartTime', breakStart.toISOString())
       } else {
         setBreakStartTime(null)
-        localStorage.removeItem('breakStartTime')
+        removeUserSpecificStorage('breakStartTime')
       }
     } catch (error: any) {
       console.error('Error loading attendance status:', error)
@@ -570,7 +644,7 @@ export function EmployeeDashboard() {
       // Set break start time
       const now = new Date()
       setBreakStartTime(now)
-      localStorage.setItem('breakStartTime', now.toISOString())
+      setUserSpecificStorage('breakStartTime', now.toISOString())
 
       toast({
         title: "Success",
@@ -608,7 +682,7 @@ export function EmployeeDashboard() {
 
       // Clear break start time
       setBreakStartTime(null)
-      localStorage.removeItem('breakStartTime')
+      removeUserSpecificStorage('breakStartTime')
 
       toast({
         title: "Success",
@@ -639,12 +713,26 @@ export function EmployeeDashboard() {
   const handleEndOfDay = async () => {
     if (isAttendanceLoading) return
 
-    // Show confirmation dialog
-    const confirmed = window.confirm(
-      "⚠️ WARNING: After ending the day, you will not be able to check in again today. Your working day will be completed.\n\nIf you need to take a break, please use the 'Start Break' button instead.\n\nAre you sure you want to end your working day?"
-    )
+    const result = await Swal.fire({
+      title: 'End Working Day',
+      html: `
+        <div style="text-align: left;">
+          <p><strong>⚠️ WARNING:</strong> After ending the day, you will not be able to check in again today. Your working day will be completed.</p>
+          <br>
+          <p>If you need to take a break, please use the 'Start Break' button instead.</p>
+          <br>
+          <p>Are you sure you want to end your working day?</p>
+        </div>
+      `,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'End Day',
+      cancelButtonText: 'Cancel'
+    })
 
-    if (!confirmed) return
+    if (!result.isConfirmed) return
 
     setIsAttendanceLoading(true)
 
@@ -654,7 +742,7 @@ export function EmployeeDashboard() {
 
       // Clear all states
       setBreakStartTime(null)
-      localStorage.removeItem('breakStartTime')
+      removeUserSpecificStorage('breakStartTime')
 
       toast({
         title: "Day Ended Successfully",
@@ -705,10 +793,18 @@ export function EmployeeDashboard() {
       // Get location
       getUserLocation().then(setLocation)
 
-      // Restore break start time from localStorage if exists
-      const storedBreakTime = localStorage.getItem('breakStartTime')
+      // Restore break start time from user-specific storage if exists
+      const storedBreakTime = getUserSpecificStorage('breakStartTime')
       if (storedBreakTime) {
-        setBreakStartTime(new Date(storedBreakTime))
+        // Validate that the stored time is from today and for current user
+        const storedDate = new Date(storedBreakTime).toDateString()
+        const today = new Date().toDateString()
+        if (storedDate === today) {
+          setBreakStartTime(new Date(storedBreakTime))
+        } else {
+          // Clear stale data
+          removeUserSpecificStorage('breakStartTime')
+        }
       }
     }
   }, []) // Empty dependency array - runs only once
@@ -720,27 +816,32 @@ export function EmployeeDashboard() {
       const now = getCurrentIST() // Use IST instead of local time
       setCurrentTime(now)
 
-      // Calculate live working time based on state (same logic as attendance clock card)
-      if (attendanceStatus?.is_checked_in && !attendanceStatus?.is_on_break && attendanceStatus?.last_check_in) {
-        // Working: Calculate live time from backend total + additional time
-        // Use backend's real-time total as base (more accurate)
-        const backendTotalStr = attendanceStatus.total_hours || "0:00:00"
-        const backendParts = backendTotalStr.split(":")
-        const backendHours = parseInt(backendParts[0]) || 0
-        const backendMinutes = parseInt(backendParts[1]) || 0
-        const backendSeconds = parseFloat(backendParts[2]) || 0
-        const backendTotalMs = (backendHours * 3600 + backendMinutes * 60 + backendSeconds) * 1000
+      // Calculate live working time if checked in (original working logic)
+      if (attendanceStatus?.is_checked_in && !attendanceStatus?.is_on_break) {
+        // Find the current session start time
+        let currentSessionStart = null
+        if (attendanceStatus.last_check_in) {
+          currentSessionStart = new Date(attendanceStatus.last_check_in)
+        }
 
-        // Calculate additional time since last backend update (small increment)
-        const lastCheckInTime = new Date(attendanceStatus.last_check_in).getTime()
-        const additionalMs = Math.max(0, now.getTime() - lastCheckInTime)
+        if (currentSessionStart) {
+          const currentSessionDuration = now.getTime() - currentSessionStart.getTime()
+          
+          // Parse total hours from backend (completed sessions)
+          const totalHoursStr = attendanceStatus.total_hours || "0:00:00"
+          const timeParts = totalHoursStr.split(":")
+          const prevHours = parseInt(timeParts[0]) || 0
+          const prevMinutes = parseInt(timeParts[1]) || 0
+          const prevSeconds = parseFloat(timeParts[2]) || 0
+          const prevTotalMs = (prevHours * 3600 + prevMinutes * 60 + prevSeconds) * 1000
 
-        const totalMs = backendTotalMs + additionalMs
-        const hours = Math.floor(totalMs / (1000 * 60 * 60))
-        const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60))
-        const seconds = Math.floor((totalMs % (1000 * 60)) / 1000)
+          const totalMs = prevTotalMs + currentSessionDuration
+          const hours = Math.floor(totalMs / (1000 * 60 * 60))
+          const minutes = Math.floor((totalMs % (1000 * 60 * 60)) / (1000 * 60))
+          const seconds = Math.floor((totalMs % (1000 * 60)) / 1000)
 
-        setLiveWorkingTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
+          setLiveWorkingTime(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
+        }
       } else {
         // On break or not checked in: Use backend's real-time total (which excludes break time)
         const totalHours = attendanceStatus?.total_hours || "0:00:00"
@@ -906,8 +1007,8 @@ export function EmployeeDashboard() {
                     <p className="text-2xl font-bold font-mono tracking-wide text-gray-600">
                       {liveWorkingTime}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Status: {attendanceStatus?.attendance_status}
+                    <p className="text-xs">
+                      Status: <span className={getStatusColor(attendanceStatus?.attendance_status)}>{attendanceStatus?.attendance_status}</span>
                     </p>
                   </>
                 ) : attendanceStatus?.is_on_break ? (

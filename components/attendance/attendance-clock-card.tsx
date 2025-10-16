@@ -13,6 +13,56 @@ import api from "@/lib/api"
 import { attendanceEvents } from "@/hooks/use-attendance-updates"
 import Swal from 'sweetalert2'
 
+// Helper functions for secure user-specific localStorage
+const getUserSpecificKey = (key: string) => {
+  const userData = authService.getUserData()
+  const userId = userData?.id
+  if (!userId) return null
+  return `${key}_user_${userId}`
+}
+
+const setUserSpecificStorage = (key: string, value: string) => {
+  const userKey = getUserSpecificKey(key)
+  if (userKey) {
+    localStorage.setItem(userKey, value)
+  }
+}
+
+const getUserSpecificStorage = (key: string) => {
+  const userKey = getUserSpecificKey(key)
+  if (userKey) {
+    return localStorage.getItem(userKey)
+  }
+  return null
+}
+
+const removeUserSpecificStorage = (key: string) => {
+  const userKey = getUserSpecificKey(key)
+  if (userKey) {
+    localStorage.removeItem(userKey)
+  }
+}
+
+const clearUserSpecificStorage = () => {
+  const userData = authService.getUserData()
+  const userId = userData?.id
+  if (!userId) return
+  
+  // Only clear stale data (from previous days), not current day data
+  const storedBreakTime = getUserSpecificStorage('breakStartTime')
+  if (storedBreakTime) {
+    const storedDate = new Date(storedBreakTime).toDateString()
+    const today = new Date().toDateString()
+    if (storedDate !== today) {
+      removeUserSpecificStorage('breakStartTime')
+      console.log('Cleared stale break time from previous day')
+    }
+  }
+  
+  // Also clear any old non-user-specific keys for cleanup
+  localStorage.removeItem('breakStartTime')
+}
+
 export function AttendanceClockCard() {
   const { toast } = useToast()
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
@@ -70,9 +120,10 @@ export function AttendanceClockCard() {
 
   // Get user's location
   const getUserLocation = (): Promise<{ lat: number; lng: number }> => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       if (!navigator.geolocation) {
-        reject(new Error('Geolocation is not supported'))
+        console.info('Geolocation is not supported by this browser')
+        resolve({ lat: 0, lng: 0 })
         return
       }
 
@@ -84,11 +135,28 @@ export function AttendanceClockCard() {
           })
         },
         (error) => {
-          console.warn('Could not get location:', error.message)
-          // Use a default location if geolocation fails
-          resolve({ lat: 0, lng: 0 })
+          // Handle different error types gracefully without warnings
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              console.info('Location access denied by user')
+              break
+            case error.POSITION_UNAVAILABLE:
+              console.info('Location information unavailable')
+              break
+            case error.TIMEOUT:
+              console.info('Location request timed out - using default location')
+              break
+            default:
+              console.info('Location unavailable - using default location')
+              break
+          }
+          resolve({ lat: 0, lng: 0 }) // Always resolve with fallback location
         },
-        { timeout: 5000, enableHighAccuracy: true }
+        { 
+          timeout: 10000, // Increased timeout to 10 seconds
+          enableHighAccuracy: false, // Faster response, less battery usage
+          maximumAge: 300000 // Cache location for 5 minutes
+        }
       )
     })
   }
@@ -103,8 +171,8 @@ export function AttendanceClockCard() {
       setIsOnBreak(status.is_on_break || false)
       setDayEnded(status.day_ended || false)
 
-      // Clear localStorage states first
-      localStorage.removeItem('breakStartTime')
+      // Clear any user-specific localStorage states first
+      clearUserSpecificStorage()
 
       // Set current session start time if checked in and not on break
       if (status.is_checked_in && status.last_check_in && !status.is_on_break) {
@@ -116,7 +184,7 @@ export function AttendanceClockCard() {
         const breakStart = new Date(status.break_start_time)
         setBreakStartTime(breakStart)
         setCurrentSessionStart(null) // Clear working session when on break
-        localStorage.setItem('breakStartTime', breakStart.toISOString())
+        setUserSpecificStorage('breakStartTime', breakStart.toISOString())
         console.log('User is on break')
       } else {
         // User is not checked in
@@ -344,15 +412,15 @@ export function AttendanceClockCard() {
     setIsMounted(true)
     setCurrentTime(getCurrentIST())
 
-    // Clear any stale localStorage data first
-    const storedBreakTime = localStorage.getItem('breakStartTime')
+    // Clear any stale user-specific data first
+    const storedBreakTime = getUserSpecificStorage('breakStartTime')
     if (storedBreakTime) {
       // Check if stored break time is from today
       const storedDate = new Date(storedBreakTime).toDateString()
       const today = new Date().toDateString()
       if (storedDate !== today) {
-        localStorage.removeItem('breakStartTime')
-        console.log('Cleared stale break time from localStorage')
+        removeUserSpecificStorage('breakStartTime')
+        console.log('Cleared stale break time from user-specific storage')
       }
     }
 
@@ -476,8 +544,8 @@ export function AttendanceClockCard() {
       setCurrentSessionStart(new Date(response.check_in_time))
       setBreakStartTime(null)
 
-      // Clear break start time from localStorage
-      localStorage.removeItem('breakStartTime')
+      // Clear break start time from user-specific storage
+      removeUserSpecificStorage('breakStartTime')
 
       toast({
         title: "Success",
@@ -539,8 +607,8 @@ export function AttendanceClockCard() {
       setBreakStartTime(now)
       setIsOnBreak(true)
 
-      // Store break start time in localStorage for persistence
-      localStorage.setItem('breakStartTime', now.toISOString())
+      // Store break start time in user-specific storage for persistence
+      setUserSpecificStorage('breakStartTime', now.toISOString())
 
       toast({
         title: "Success",
@@ -581,8 +649,8 @@ export function AttendanceClockCard() {
       setBreakStartTime(null)
       setIsOnBreak(false)
 
-      // Clear break start time from localStorage
-      localStorage.removeItem('breakStartTime')
+      // Clear break start time from user-specific storage
+      removeUserSpecificStorage('breakStartTime')
 
       toast({
         title: "Success",
@@ -646,8 +714,8 @@ export function AttendanceClockCard() {
       setIsOnBreak(false)
       setDayEnded(true)
 
-      // Clear localStorage
-      localStorage.removeItem('breakStartTime')
+      // Clear user-specific storage
+      removeUserSpecificStorage('breakStartTime')
 
       toast({
         title: "Day Ended Successfully",

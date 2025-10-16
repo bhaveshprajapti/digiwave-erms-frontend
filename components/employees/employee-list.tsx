@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { deleteEmployee, updateEmployee } from "@/hooks/use-employees"
 import { EmployeeModal } from "./employee-modal"
 import { EmployeeDetailsModal } from "./employee-details-modal"
+import { EmployeeSessionModal } from "@/components/attendance/admin/employee-session-modal"
 import api from "@/lib/api"
 
 import { useEmployees } from "@/hooks/use-employees"
@@ -62,6 +63,14 @@ export function EmployeeList() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [detailsModalOpen, setDetailsModalOpen] = useState(false)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
+  
+  // Attendance modal state
+  const [attendanceModal, setAttendanceModal] = useState<{
+    isOpen: boolean
+    employeeName: string
+    employeeId: number
+    selectedDate: string
+  }>({ isOpen: false, employeeName: "", employeeId: 0, selectedDate: new Date().toISOString().split('T')[0] })
   const { employees, isLoading, error, mutate } = useEmployees()
   const { employeeTypes, isLoading: loadingTypes } = useEmployeeTypes()
   const { designations, isLoading: loadingDesignations } = useDesignations()
@@ -228,7 +237,20 @@ export function EmployeeList() {
                 </button>
               )},
               { key: 'full_name', header: 'Full Name', cell: (e) => (
-                <span className="font-medium">{e.first_name} {e.last_name}</span>
+                <button 
+                  className="text-left text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer transition-colors"
+                  onClick={() => {
+                    const employeeName = `${e.first_name} ${e.last_name}`
+                    setAttendanceModal({ 
+                      isOpen: true, 
+                      employeeId: parseInt(e.id), 
+                      employeeName, 
+                      selectedDate: new Date().toISOString().split('T')[0] 
+                    })
+                  }}
+                >
+                  {e.first_name} {e.last_name}
+                </button>
               )},
               { key: 'email', header: 'Email', cell: (e) => <span className="text-sm">{e.email}</span> },
               { key: 'phone', header: 'Phone', cell: (e) => <span className="text-sm">{e.phone || '-'}</span> },
@@ -276,6 +298,20 @@ export function EmployeeList() {
                     onEdit={() => handleEditEmployee(employee)}
                     onDelete={currentUser?.id !== employee.id && !employee.is_superuser ? () => handleDeleteEmployee(employee) : undefined}
                     extras={[
+                      { 
+                        title: 'View Attendance', 
+                        onClick: () => {
+                          const employeeName = `${employee.first_name} ${employee.last_name}`
+                          setAttendanceModal({ 
+                            isOpen: true, 
+                            employeeId: parseInt(employee.id), 
+                            employeeName, 
+                            selectedDate: new Date().toISOString().split('T')[0] 
+                          })
+                        }, 
+                        className: 'hover:bg-blue-100', 
+                        icon: <Clock className="h-4 w-4 text-blue-600" /> 
+                      },
                       ...(getEmployeeTypeName(employee.employee_type).toLowerCase() === 'fixed'
                         ? [{ title: 'Add Fixed Details', onClick: () => {}, className: 'hover:bg-green-100', icon: <DollarSign className="h-4 w-4 text-green-600" /> }] as any
                         : []),
@@ -309,6 +345,16 @@ export function EmployeeList() {
           setDetailsModalOpen(false)
           setSelectedEmployeeId(null)
         }}
+      />
+
+      {/* Attendance Modal */}
+      <EmployeeSessionModal
+        isOpen={attendanceModal.isOpen}
+        onClose={() => setAttendanceModal(prev => ({ ...prev, isOpen: false }))}
+        employeeName={attendanceModal.employeeName}
+        employeeId={attendanceModal.employeeId}
+        selectedDate={attendanceModal.selectedDate}
+        onDateChange={(date: string) => setAttendanceModal(prev => ({ ...prev, selectedDate: date }))}
       />
 
       <AlertDialog open={!!employeeToDelete} onOpenChange={(open) => !open && setEmployeeToDelete(null)}>

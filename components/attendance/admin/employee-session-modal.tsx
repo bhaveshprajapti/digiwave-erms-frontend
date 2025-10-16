@@ -11,17 +11,15 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Clock, Coffee, Play, User, Calendar, RefreshCw } from "lucide-react"
+import { DatePicker } from "@/components/ui/date-picker"
+import { Clock, Coffee, Play, User, Calendar, RefreshCw, LogIn, LogOut, Timer, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { adminResetDay } from "@/lib/api/attendances"
+import { adminResetDay, listAttendances, AttendanceDTO } from "@/lib/api/attendances"
 import { attendanceEvents } from "@/hooks/use-attendance-updates"
 
 interface Session {
-  id: string
-  clockIn: Date
-  clockOut?: Date
-  type: "work" | "break"
-  duration: number // in minutes
+  check_in: string
+  check_out?: string
 }
 
 interface EmployeeSessionModalProps {
@@ -30,6 +28,7 @@ interface EmployeeSessionModalProps {
   employeeName: string
   employeeId: number
   selectedDate: string
+  onDateChange?: (date: string) => void
 }
 
 export function EmployeeSessionModal({
@@ -38,81 +37,87 @@ export function EmployeeSessionModal({
   employeeName,
   employeeId,
   selectedDate,
+  onDateChange,
 }: EmployeeSessionModalProps) {
+  const [attendance, setAttendance] = useState<AttendanceDTO | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(false)
-  const [totalWorkTime, setTotalWorkTime] = useState(0)
-  const [totalBreakTime, setTotalBreakTime] = useState(0)
+  const [totalWorkTime, setTotalWorkTime] = useState("0:00:00")
+  const [totalBreakTime, setTotalBreakTime] = useState("0:00:00")
   const [isResetting, setIsResetting] = useState(false)
   const [dayEnded, setDayEnded] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const { toast } = useToast()
 
-  // Mock data generator for now - replace with actual API call
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  // Load actual session data from API
   const loadSessionData = async () => {
     setLoading(true)
     try {
-      // This would be replaced with actual API call
-      // const sessionsData = await getEmployeeDaySessionsAPI(employeeId, date)
-      // For now, we'll simulate checking if day ended
-      // In real implementation, this would come from the API response
-      
-      // Mock check for day ended status (you would get this from API)
-      const mockDayEnded = Math.random() > 0.5 // 50% chance for demo
-      setDayEnded(mockDayEnded)
+      // Fetch attendance data for the specific employee and date
+      const response = await listAttendances({
+        user: employeeId,
+        start_date: selectedDate,
+        end_date: selectedDate,
+        page_size: 1
+      })
 
-      // Mock data for demonstration
-      const mockSessions: Session[] = [
-        {
-          id: "1",
-          clockIn: new Date(`${selectedDate} 09:00:00`),
-          clockOut: new Date(`${selectedDate} 12:30:00`),
-          type: "work",
-          duration: 210, // 3.5 hours
-        },
-        {
-          id: "2",
-          clockIn: new Date(`${selectedDate} 12:30:00`),
-          clockOut: new Date(`${selectedDate} 13:30:00`),
-          type: "break",
-          duration: 60, // 1 hour lunch
-        },
-        {
-          id: "3",
-          clockIn: new Date(`${selectedDate} 13:30:00`),
-          clockOut: new Date(`${selectedDate} 17:00:00`),
-          type: "work",
-          duration: 210, // 3.5 hours
-        },
-        {
-          id: "4",
-          clockIn: new Date(`${selectedDate} 17:00:00`),
-          clockOut: new Date(`${selectedDate} 17:15:00`),
-          type: "break",
-          duration: 15, // 15 min break
-        },
-        {
-          id: "5",
-          clockIn: new Date(`${selectedDate} 17:15:00`),
-          clockOut: new Date(`${selectedDate} 18:30:00`),
-          type: "work",
-          duration: 75, // 1.25 hours
-        },
-      ]
-
-      setSessions(mockSessions)
-
-      const workTime = mockSessions
-        .filter(s => s.type === "work")
-        .reduce((total, session) => total + session.duration, 0)
-
-      const breakTime = mockSessions
-        .filter(s => s.type === "break")
-        .reduce((total, session) => total + session.duration, 0)
-
-      setTotalWorkTime(workTime)
-      setTotalBreakTime(breakTime)
+      if (response.results.length > 0) {
+        const attendanceData = response.results[0]
+        setAttendance(attendanceData)
+        setSessions(attendanceData.sessions || [])
+        setTotalWorkTime(attendanceData.total_hours || "0:00:00")
+        
+        // Calculate total break time from sessions if backend value is 0 or missing
+        const calculateTotalBreakTime = () => {
+          if (attendanceData.total_break_time && attendanceData.total_break_time !== '0:00:00') {
+            return attendanceData.total_break_time
+          }
+          
+          // Fallback: calculate from sessions
+          const sessions = attendanceData.sessions || []
+          let totalBreakMs = 0
+          for (let i = 0; i < sessions.length - 1; i++) {
+            const currentSession = sessions[i]
+            const nextSession = sessions[i + 1]
+            
+            if (currentSession.check_out && nextSession.check_in) {
+              const breakStart = new Date(currentSession.check_out)
+              const breakEnd = new Date(nextSession.check_in)
+              totalBreakMs += breakEnd.getTime() - breakStart.getTime()
+            }
+          }
+          
+          const hours = Math.floor(totalBreakMs / (1000 * 60 * 60))
+          const minutes = Math.floor((totalBreakMs % (1000 * 60 * 60)) / (1000 * 60))
+          const seconds = Math.floor((totalBreakMs % (1000 * 60)) / 1000)
+          
+          return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+        }
+        
+        setTotalBreakTime(calculateTotalBreakTime())
+        
+        // Check if day has ended (last session has check_out)
+        const lastSession = sessions[sessions.length - 1]
+        setDayEnded(sessions.length > 0 && lastSession?.check_out !== null)
+      } else {
+        // No attendance data for this date
+        setAttendance(null)
+        setSessions([])
+        setTotalWorkTime("0:00:00")
+        setTotalBreakTime("0:00:00")
+        setDayEnded(false)
+      }
     } catch (error) {
       console.error("Error loading session data:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load attendance data",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
@@ -124,24 +129,31 @@ export function EmployeeSessionModal({
     }
   }, [isOpen, employeeId, selectedDate])
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
+  const formatTime = (timeString: string) => {
+    if (!isMounted) return "--:--:--"
+    return new Date(timeString).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit',
-      hour12: true
+      second: '2-digit'
     })
   }
 
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60)
-    const mins = Math.floor(minutes % 60)
-    const secs = Math.floor((minutes % 1) * 60) // Extract seconds from decimal part
-
-    return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  const formatDuration = (checkIn: string, checkOut?: string) => {
+    if (!checkOut) return "Ongoing"
+    
+    const start = new Date(checkIn)
+    const end = new Date(checkOut)
+    const duration = end.getTime() - start.getTime()
+    
+    const hours = Math.floor(duration / (1000 * 60 * 60))
+    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60))
+    const seconds = Math.floor((duration % (1000 * 60)) / 1000)
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
 
   const formatDate = (dateStr: string) => {
+    if (!isMounted) return dateStr
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
@@ -149,6 +161,15 @@ export function EmployeeSessionModal({
       month: 'long',
       day: 'numeric'
     })
+  }
+
+  const handleDateChange = (date: Date | undefined) => {
+    if (date) {
+      const dateStr = date.toISOString().split('T')[0]
+      if (onDateChange) {
+        onDateChange(dateStr)
+      }
+    }
   }
 
   const handleResetDay = async () => {
@@ -198,15 +219,25 @@ export function EmployeeSessionModal({
       >
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <div>
+            <div className="flex-1">
               <DialogTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
                 {employeeName} - Session Details
               </DialogTitle>
-              <DialogDescription className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                {formatDate(selectedDate)}
-              </DialogDescription>
+              <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>{formatDate(selectedDate)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Select Date:</span>
+                  <DatePicker
+                    value={new Date(selectedDate)}
+                    onChange={handleDateChange}
+                    className="w-40"
+                  />
+                </div>
+              </div>
             </div>
             {dayEnded && (
               <Button
@@ -243,99 +274,154 @@ export function EmployeeSessionModal({
               </div>
             )}
 
-            {/* Summary Cards - Same style as attendance page */}
-            <div className="grid gap-4 md:grid-cols-3">
+            {/* Summary Cards - Same style as employee attendance page */}
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              {/* Total Working Hours Card */}
               <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-card to-muted/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Work Time</p>
-                      <p className="text-2xl font-bold text-blue-600">{formatDuration(totalWorkTime)}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-blue-600" />
-                    </div>
-                  </div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                  <CardTitle className="text-xs font-medium">Total Working Hours</CardTitle>
+                  <Timer className="h-3 w-3 text-blue-600" />
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <div className="text-lg font-bold text-blue-600 font-mono">{totalWorkTime}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Total time worked
+                  </p>
                 </CardContent>
               </Card>
 
-              <Card className="border-l-4 border-l-orange-500 bg-gradient-to-br from-card to-muted/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Break Time</p>
-                      <p className="text-2xl font-bold text-orange-600">{formatDuration(totalBreakTime)}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <Coffee className="h-6 w-6 text-orange-600" />
-                    </div>
-                  </div>
+              {/* Total Sessions Card */}
+              <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-card to-muted/20">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                  <CardTitle className="text-xs font-medium">Total Sessions</CardTitle>
+                  <User className="h-3 w-3 text-purple-600" />
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <div className="text-lg font-bold text-purple-600">{sessions.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    Check-in sessions
+                  </p>
                 </CardContent>
               </Card>
 
+              {/* Completed Sessions Card */}
               <Card className="border-l-4 border-l-green-500 bg-gradient-to-br from-card to-muted/20">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Time</p>
-                      <p className="text-2xl font-bold text-green-600">{formatDuration(totalWorkTime + totalBreakTime)}</p>
-                    </div>
-                    <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Clock className="h-6 w-6 text-green-600" />
-                    </div>
-                  </div>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                  <CardTitle className="text-xs font-medium">Completed Sessions</CardTitle>
+                  <CheckCircle className="h-3 w-3 text-green-600" />
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <div className="text-lg font-bold text-green-600">{sessions.filter((s: any) => s.check_out).length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {sessions.length > 0 
+                      ? `${Math.round((sessions.filter((s: any) => s.check_out).length / sessions.length) * 100)}% completed`
+                      : "No sessions"
+                    }
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Break Time Card */}
+              <Card className="border-l-4 border-l-orange-500 bg-gradient-to-br from-card to-muted/20">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+                  <CardTitle className="text-xs font-medium">Total Break Time</CardTitle>
+                  <Coffee className="h-3 w-3 text-orange-600" />
+                </CardHeader>
+                <CardContent className="pb-2">
+                  <div className="text-lg font-bold text-orange-600 font-mono">{totalBreakTime}</div>
+                  <p className="text-xs text-muted-foreground">
+                    All sessions combined
+                  </p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Session Timeline */}
+            {/* Session Details - Same format as employee attendance */}
             <Card>
               <CardHeader>
-                <CardTitle>Session Timeline</CardTitle>
+                <CardTitle>Session Details</CardTitle>
               </CardHeader>
               <CardContent>
                 {sessions.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    No session data available for this date.
-                  </p>
+                  <div className="text-center py-8 text-muted-foreground">
+                    No sessions recorded for this date
+                  </div>
                 ) : (
-                  <div className="space-y-4">
-                    {sessions.map((session, index) => (
-                      <div key={session.id} className="flex items-center gap-4">
-                        <div className="flex flex-col items-center">
-                          <div className={`p-2 rounded-full ${session.type === 'work'
-                            ? 'bg-blue-100 text-blue-600'
-                            : 'bg-orange-100 text-orange-600'
-                            }`}>
-                            {session.type === 'work' ? (
-                              <Play className="h-4 w-4" />
-                            ) : (
-                              <Coffee className="h-4 w-4" />
-                            )}
-                          </div>
-                          {index < sessions.length - 1 && (
-                            <div className="w-px h-8 bg-border mt-2"></div>
-                          )}
-                        </div>
-
-                        <div className="flex-1">
+                  <div className="space-y-2">
+                    {sessions.map((session: any, index: number) => (
+                      <div key={`session-${index}`}>
+                        {/* Session Card - White Background with Labels and Larger Font */}
+                        <div className="border rounded-md px-4 py-3 bg-white shadow-sm">
                           <div className="flex items-center justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <Badge
-                                  variant={session.type === 'work' ? 'default' : 'secondary'}
-                                  className="text-xs"
-                                >
-                                  {session.type === 'work' ? 'Work Session' : 'Break Time'}
-                                </Badge>
-                                <span className="text-sm font-medium">
-                                  {formatDuration(session.duration)}
+                            {/* Session Info with Labels */}
+                            <div className="flex items-center gap-6">
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium text-muted-foreground text-sm">#{index + 1}</span>
+                              </div>
+                              
+                              {/* Check In */}
+                              <div className="flex flex-col items-start">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <LogIn className="h-3 w-3 text-green-600" />
+                                  <span className="text-xs text-green-600 font-medium">Check In</span>
+                                </div>
+                                <span className="font-mono text-sm font-medium">{formatTime(session.check_in)}</span>
+                              </div>
+                              
+                              {/* Check Out */}
+                              <div className="flex flex-col items-start">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <LogOut className="h-3 w-3 text-red-600" />
+                                  <span className="text-xs text-red-600 font-medium">Check Out</span>
+                                </div>
+                                <span className="font-mono text-sm font-medium">
+                                  {session.check_out ? formatTime(session.check_out) : "Active"}
                                 </span>
                               </div>
-                              <div className="text-sm text-muted-foreground">
-                                {formatTime(session.clockIn)} - {session.clockOut ? formatTime(session.clockOut) : 'Ongoing'}
+                              
+                              {/* Duration */}
+                              <div className="flex flex-col items-start">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <Timer className="h-3 w-3 text-blue-600" />
+                                  <span className="text-xs text-blue-600 font-medium">Duration</span>
+                                </div>
+                                <span className="font-mono text-sm font-medium">
+                                  {formatDuration(session.check_in, session.check_out)}
+                                </span>
                               </div>
+
+                              {/* Break After Session */}
+                              {index < sessions.length - 1 && (
+                                <div className="flex flex-col items-start">
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <Coffee className="h-3 w-3 text-orange-600" />
+                                    <span className="text-xs text-orange-600 font-medium">Break After</span>
+                                  </div>
+                                  <span className="font-mono text-sm font-medium text-orange-600">
+                                    {(() => {
+                                      const currentCheckOut = session.check_out
+                                      const nextCheckIn = sessions[index + 1]?.check_in
+                                      if (currentCheckOut && nextCheckIn) {
+                                        const breakStart = new Date(currentCheckOut)
+                                        const breakEnd = new Date(nextCheckIn)
+                                        const breakDuration = breakEnd.getTime() - breakStart.getTime()
+                                        const hours = Math.floor(breakDuration / (1000 * 60 * 60))
+                                        const minutes = Math.floor((breakDuration % (1000 * 60 * 60)) / (1000 * 60))
+                                        const seconds = Math.floor((breakDuration % (1000 * 60)) / 1000)
+                                        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+                                      }
+                                      return "0:00:00"
+                                    })()}
+                                  </span>
+                                </div>
+                              )}
+
                             </div>
+
+                            {/* Status Badge */}
+                            <Badge variant={session.check_out ? "secondary" : "default"} className="text-sm">
+                              {session.check_out ? "Completed" : "Active"}
+                            </Badge>
                           </div>
                         </div>
                       </div>
@@ -356,25 +442,44 @@ export function EmployeeSessionModal({
                     <div>
                       <div className="text-sm text-muted-foreground">Work vs Break Ratio</div>
                       <div className="text-lg font-semibold">
-                        {totalWorkTime > 0 && totalBreakTime > 0
-                          ? `${Math.round(totalWorkTime / totalBreakTime * 10) / 10}:1`
-                          : 'N/A'
-                        }
+                        {(() => {
+                          // Convert time strings to seconds for calculation
+                          const workSeconds = totalWorkTime.split(':').reduce((acc, time, i) => acc + parseInt(time) * Math.pow(60, 2 - i), 0)
+                          const breakSeconds = totalBreakTime.split(':').reduce((acc, time, i) => acc + parseInt(time) * Math.pow(60, 2 - i), 0)
+                          
+                          if (workSeconds > 0 && breakSeconds > 0) {
+                            return `${Math.round((workSeconds / breakSeconds) * 10) / 10}:1`
+                          }
+                          return 'N/A'
+                        })()}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Work minutes per break minute
+                        Work time per break time
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Average Session Length</div>
                       <div className="text-lg font-semibold">
                         {sessions.length > 0
-                          ? formatDuration(Math.round((totalWorkTime + totalBreakTime) / sessions.length))
+                          ? (() => {
+                              const totalSessionTime = sessions.reduce((total, session) => {
+                                if (session.check_out) {
+                                  const duration = new Date(session.check_out).getTime() - new Date(session.check_in).getTime()
+                                  return total + duration
+                                }
+                                return total
+                              }, 0)
+                              const avgMs = totalSessionTime / sessions.filter(s => s.check_out).length
+                              const hours = Math.floor(avgMs / (1000 * 60 * 60))
+                              const minutes = Math.floor((avgMs % (1000 * 60 * 60)) / (1000 * 60))
+                              const seconds = Math.floor((avgMs % (1000 * 60)) / 1000)
+                              return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+                            })()
                           : 'N/A'
                         }
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Per session
+                        Per completed session
                       </div>
                     </div>
                   </div>

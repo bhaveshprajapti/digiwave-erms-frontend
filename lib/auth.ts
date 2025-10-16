@@ -136,6 +136,9 @@ class AuthService {
 
       const data: LoginResponse = response.data
 
+      // Clear data only if a different user is logging in
+      this.clearOtherUsersData(data.user.id)
+      
       // Store tokens and user data
       this.setTokens(data.access, data.refresh)
       this.setUserData(data.user)
@@ -174,12 +177,40 @@ class AuthService {
   }
 
   logout(): void {
+    // Don't clear attendance data - user should be able to continue their session after re-login
     this.removeTokens()
     // Redirect to login page
     if (typeof window !== 'undefined') {
       window.location.href = '/login'
     }
   }
+
+  // Clear other users' data when a different user logs in
+  private clearOtherUsersData(newUserId: number): void {
+    if (typeof window !== 'undefined') {
+      // Get all localStorage keys
+      const keys = Object.keys(localStorage)
+      
+      // Remove attendance data for other users (not the current user)
+      keys.forEach(key => {
+        if (key.includes('_user_') && key.includes('breakStartTime')) {
+          // Extract user ID from key (e.g., "breakStartTime_user_123" -> "123")
+          const match = key.match(/_user_(\d+)$/)
+          if (match) {
+            const keyUserId = parseInt(match[1])
+            if (keyUserId !== newUserId) {
+              localStorage.removeItem(key)
+            }
+          }
+        }
+      })
+      
+      // Also clear any old non-user-specific keys for cleanup
+      localStorage.removeItem('breakStartTime')
+    }
+  }
+
+
 
   isAuthenticated(): boolean {
     return this.getAccessToken() !== null

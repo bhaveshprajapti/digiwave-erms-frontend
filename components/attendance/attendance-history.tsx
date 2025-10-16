@@ -105,7 +105,7 @@ export function AttendanceHistory() {
               header: 'Date',
               sortable: true,
               cell: (r: any) => (
-                <div className="font-medium cursor-pointer hover:text-primary" onClick={() => handleViewDetails(r)}>
+                <div className="font-medium cursor-pointer text-blue-600 hover:text-blue-800 hover:underline transition-colors" onClick={() => handleViewDetails(r)}>
                   {isMounted ? new Date(r.date).toLocaleDateString('en-US', {
                     weekday: 'short',
                     month: 'short',

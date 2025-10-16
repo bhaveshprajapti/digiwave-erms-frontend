@@ -104,12 +104,14 @@ export default function AdminAttendancePage() {
     load()
   }, [filterUser, filterStart, filterEnd, page, pageSize])
 
-  const openSessionModal = (employeeId: number, employeeName: string, date: string) => {
+  const openSessionModal = (employeeId: number, employeeName: string, date?: string) => {
+    // Default to today's date if no date is provided
+    const selectedDate = date || new Date().toISOString().split('T')[0]
     setSessionModal({ 
       isOpen: true, 
       employeeId, 
       employeeName, 
-      selectedDate: date 
+      selectedDate 
     })
   }
 
@@ -228,7 +230,7 @@ export default function AdminAttendancePage() {
                 const userName = userOptions.find(u => Number(u.value)===Number(r.user))?.label || `User ${r.user}`
                 return (
                   <button 
-                    className="text-left hover:text-blue-600 hover:underline font-medium cursor-pointer transition-colors"
+                    className="text-left text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer transition-colors"
                     onClick={() => openSessionModal(r.user, userName, r.date)}
                   >
                     {userName}
