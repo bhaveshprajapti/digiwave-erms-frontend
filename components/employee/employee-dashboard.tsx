@@ -62,7 +62,7 @@ const clearUserSpecificStorage = () => {
   const userData = authService.getUserData()
   const userId = userData?.id
   if (!userId) return
-  
+
   // Only clear stale data (from previous days), not current day data
   const storedBreakTime = getUserSpecificStorage('breakStartTime')
   if (storedBreakTime) {
@@ -73,7 +73,7 @@ const clearUserSpecificStorage = () => {
       console.log('Cleared stale break time from previous day')
     }
   }
-  
+
   // Also clear any old non-user-specific keys for cleanup
   localStorage.removeItem('breakStartTime')
 }
@@ -82,16 +82,16 @@ export function EmployeeDashboard() {
   // Helper function to format duration to HH:MM:SS with proper padding
   const formatDuration = (timeString?: string) => {
     if (!timeString) return "00:00:00"
-    
+
     // Remove microseconds if present (e.g., "1:23:45.123456" -> "1:23:45")
     const cleanTime = timeString.split('.')[0]
     const parts = cleanTime.split(':')
-    
+
     // Ensure proper padding for all parts
     const hours = (parts[0] || '0').padStart(2, '0')
     const minutes = (parts[1] || '0').padStart(2, '0')
     const seconds = (parts[2] || '0').padStart(2, '0')
-    
+
     return `${hours}:${minutes}:${seconds}`
   }
 
@@ -120,7 +120,7 @@ export function EmployeeDashboard() {
   // Helper function to get appropriate color for attendance status
   const getStatusColor = (status?: string) => {
     if (!status) return "text-muted-foreground"
-    
+
     switch (status.toLowerCase()) {
       case 'present':
       case 'active':
@@ -438,7 +438,7 @@ export function EmployeeDashboard() {
     // For subsequent check-ins (after break), be more lenient
     if (!isFirstCheckin) {
       const currentHour = getISTHour()
-      
+
       // Just check if within reasonable hours (6 AM to 11 PM) in IST
       if (currentHour >= 6 && currentHour <= 23) {
         return { allowed: true, message: '' }
@@ -826,7 +826,7 @@ export function EmployeeDashboard() {
 
         if (currentSessionStart) {
           const currentSessionDuration = now.getTime() - currentSessionStart.getTime()
-          
+
           // Parse total hours from backend (completed sessions)
           const totalHoursStr = attendanceStatus.total_hours || "0:00:00"
           const timeParts = totalHoursStr.split(":")
@@ -1046,22 +1046,22 @@ export function EmployeeDashboard() {
                 /* Check In Button - Primary action when not working */
                 <Button
                   onClick={handleClockIn}
-                  size="sm"
-                  className="bg-green-600 hover:bg-green-700 text-white border-0 px-6"
+                  size="lg"
+                  className="bg-green-600 hover:bg-green-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
                   disabled={isAttendanceLoading || attendanceStatus?.is_on_leave}
                 >
-                  <LogIn className="mr-2 h-4 w-4" />
+                  <LogIn className="mr-2 h-5 w-5" />
                   {isAttendanceLoading ? "Checking In..." : "Check In"}
                 </Button>
               ) : attendanceStatus?.is_on_break ? (
                 /* End Break Button - When on break - Same color as Start Break */
                 <Button
                   onClick={handleEndBreak}
-                  size="sm"
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-6"
+                  size="lg"
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
                   disabled={isAttendanceLoading}
                 >
-                  <LogIn className="mr-2 h-4 w-4" />
+                  <LogIn className="mr-2 h-5 w-5" />
                   {isAttendanceLoading ? "Ending Break..." : "End Break"}
                 </Button>
               ) : attendanceStatus?.is_checked_in ? (
@@ -1069,20 +1069,20 @@ export function EmployeeDashboard() {
                 <>
                   <Button
                     onClick={handleStartBreak}
-                    size="sm"
-                    className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-6"
+                    size="lg"
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
                     disabled={isAttendanceLoading}
                   >
-                    <Coffee className="mr-2 h-4 w-4" />
+                    <Coffee className="mr-2 h-5 w-5" />
                     {isAttendanceLoading ? "Starting Break..." : "Start Break"}
                   </Button>
                   <Button
                     onClick={handleEndOfDay}
-                    size="sm"
-                    className="bg-red-600 hover:bg-red-700 text-white border-0 px-6"
+                    size="lg"
+                    className="bg-red-600 hover:bg-red-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
                     disabled={isAttendanceLoading}
                   >
-                    <LogOut className="mr-2 h-4 w-4" />
+                    <LogOut className="mr-2 h-5 w-5" />
                     {isAttendanceLoading ? "Ending Day..." : "End of Day"}
                   </Button>
                 </>

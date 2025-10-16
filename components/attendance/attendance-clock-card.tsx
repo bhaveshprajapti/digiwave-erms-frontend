@@ -47,7 +47,7 @@ const clearUserSpecificStorage = () => {
   const userData = authService.getUserData()
   const userId = userData?.id
   if (!userId) return
-  
+
   // Only clear stale data (from previous days), not current day data
   const storedBreakTime = getUserSpecificStorage('breakStartTime')
   if (storedBreakTime) {
@@ -58,7 +58,7 @@ const clearUserSpecificStorage = () => {
       console.log('Cleared stale break time from previous day')
     }
   }
-  
+
   // Also clear any old non-user-specific keys for cleanup
   localStorage.removeItem('breakStartTime')
 }
@@ -73,16 +73,16 @@ export function AttendanceClockCard() {
   // Helper function to format duration to HH:MM:SS with proper padding
   const formatDuration = (timeString?: string) => {
     if (!timeString) return "00:00:00"
-    
+
     // Remove microseconds if present (e.g., "1:23:45.123456" -> "1:23:45")
     const cleanTime = timeString.split('.')[0]
     const parts = cleanTime.split(':')
-    
+
     // Ensure proper padding for all parts
     const hours = (parts[0] || '0').padStart(2, '0')
     const minutes = (parts[1] || '0').padStart(2, '0')
     const seconds = (parts[2] || '0').padStart(2, '0')
-    
+
     return `${hours}:${minutes}:${seconds}`
   }
 
@@ -152,7 +152,7 @@ export function AttendanceClockCard() {
           }
           resolve({ lat: 0, lng: 0 }) // Always resolve with fallback location
         },
-        { 
+        {
           timeout: 10000, // Increased timeout to 10 seconds
           enableHighAccuracy: false, // Faster response, less battery usage
           maximumAge: 300000 // Cache location for 5 minutes
@@ -166,7 +166,7 @@ export function AttendanceClockCard() {
     try {
       const status = await getAttendanceStatus()
       console.log('Loading attendance status:', status)
-      
+
       setAttendanceStatus(status)
       setIsOnBreak(status.is_on_break || false)
       setDayEnded(status.day_ended || false)
@@ -191,7 +191,7 @@ export function AttendanceClockCard() {
         setCurrentSessionStart(null)
         setBreakStartTime(null)
         console.log('User is not checked in')
-        
+
         // Set static working hours when not checked in
         const totalHours = status.total_hours || "0:00:00"
         const cleanTime = formatDuration(totalHours)
@@ -218,7 +218,7 @@ export function AttendanceClockCard() {
         api.get(`/accounts/users/${userData.id}/`),
         api.get('/common/shifts/')
       ])
-      
+
       const fullUser = userResponse.data
       setUserShifts(fullUser.shifts || [])
       setShiftsData(shiftsResponse.data || [])
@@ -329,7 +329,7 @@ export function AttendanceClockCard() {
     // For subsequent check-ins (after break), be more lenient
     if (!isFirstCheckin) {
       const currentHour = getISTHour()
-      
+
       // Just check if within reasonable hours (6 AM to 11 PM) in IST
       if (currentHour >= 6 && currentHour <= 23) {
         return { allowed: true, message: '' }
@@ -446,7 +446,7 @@ export function AttendanceClockCard() {
       // Calculate live working time if checked in and working (original working logic)
       if (currentSessionStart && attendanceStatus?.is_checked_in && !isOnBreak) {
         const currentSessionDuration = now.getTime() - currentSessionStart.getTime()
-        
+
         // Parse total hours from backend (completed sessions)
         const totalHoursStr = attendanceStatus.total_hours || "0:00:00"
         const timeParts = totalHoursStr.split(":")
@@ -575,7 +575,7 @@ export function AttendanceClockCard() {
 
   const handleStartBreak = async () => {
     if (isLoading) return
-    
+
     // Validate state before starting break
     if (!attendanceStatus?.is_checked_in) {
       toast({
@@ -588,7 +588,7 @@ export function AttendanceClockCard() {
 
     if (isOnBreak || attendanceStatus?.is_on_break) {
       toast({
-        title: "Error", 
+        title: "Error",
         description: "You are already on break",
         variant: "destructive"
       })
@@ -820,12 +820,11 @@ export function AttendanceClockCard() {
       {/* Main Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Working Hours Card - Dynamic Colors */}
-        <Card className={`border-l-4 ${getBorderColor()} hover:shadow-md ${
-          dayEnded ? 'bg-gradient-to-br from-card to-muted/20' :
+        <Card className={`border-l-4 ${getBorderColor()} hover:shadow-md ${dayEnded ? 'bg-white' :
           attendanceStatus?.is_checked_in ? 'bg-gradient-to-br from-green-100/60 via-green-50/30 to-card shadow-green-100/20 shadow-lg' :
-          isOnBreak ? 'bg-gradient-to-br from-yellow-100/60 via-yellow-50/30 to-card shadow-yellow-100/20 shadow-lg' :
-          'bg-gradient-to-br from-card to-muted/20'
-        }`}>
+            isOnBreak ? 'bg-gradient-to-br from-yellow-100/60 via-yellow-50/30 to-card shadow-yellow-100/20 shadow-lg' :
+              'bg-white'
+          }`}>
           {/* Color overlay for active states */}
           {attendanceStatus?.is_checked_in && !dayEnded && (
             <div className="absolute inset-0 bg-gradient-to-br from-green-200/15 via-transparent to-transparent pointer-events-none" />
@@ -833,7 +832,7 @@ export function AttendanceClockCard() {
           {isOnBreak && !dayEnded && (
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-200/15 via-transparent to-transparent pointer-events-none" />
           )}
-          
+
           <CardContent className="p-4 relative z-10">
             <div className="flex items-center justify-between">
               <div className="flex-1">
@@ -842,9 +841,9 @@ export function AttendanceClockCard() {
                   {isMounted ? liveWorkingTime : "00:00:00"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
-                  {dayEnded ? "Day completed" : 
-                   attendanceStatus?.is_checked_in ? "Live working time" : 
-                   isOnBreak ? "On break" : "Today's total working time"}
+                  {dayEnded ? "Day completed" :
+                    attendanceStatus?.is_checked_in ? "Live working time" :
+                      isOnBreak ? "On break" : "Today's total working time"}
                 </p>
               </div>
               <div className={`h-14 w-14 ${getIconBgColor()} rounded-xl flex items-center justify-center shadow-sm`}>
@@ -855,11 +854,10 @@ export function AttendanceClockCard() {
         </Card>
 
         {/* Sessions Card */}
-        <Card className={`border-l-4 border-l-purple-500 ${
-          (attendanceStatus?.total_sessions || 0) > 0 ? 
-            'bg-gradient-to-br from-purple-100/60 via-purple-50/30 to-card shadow-purple-100/20 shadow-lg' :
-            'bg-gradient-to-br from-card to-muted/20'
-        }`}>
+        <Card className={`border-l-4 border-l-purple-500 ${(attendanceStatus?.total_sessions || 0) > 0 ?
+          'bg-gradient-to-br from-purple-100/60 via-purple-50/30 to-card shadow-purple-100/20 shadow-lg' :
+          'bg-white'
+          }`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -879,15 +877,14 @@ export function AttendanceClockCard() {
         </Card>
 
         {/* Break Time Card - Dynamic Colors */}
-        <Card className={`border-l-4 border-l-yellow-500 hover:shadow-md ${
-          isOnBreak ? 'bg-gradient-to-br from-yellow-100/60 via-yellow-50/30 to-card shadow-yellow-100/20 shadow-lg' :
-          'bg-gradient-to-br from-card to-muted/20'
-        }`}>
+        <Card className={`border-l-4 border-l-yellow-500 hover:shadow-md ${isOnBreak ? 'bg-gradient-to-br from-yellow-100/60 via-yellow-50/30 to-card shadow-yellow-100/20 shadow-lg' :
+          'bg-white'
+          }`}>
           {/* Color overlay for break state */}
           {isOnBreak && (
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-200/15 via-transparent to-transparent pointer-events-none" />
           )}
-          
+
           <CardContent className="p-4 relative z-10">
             <div className="flex items-center justify-between">
               <div className="flex-1">
@@ -907,27 +904,25 @@ export function AttendanceClockCard() {
         </Card>
 
         {/* Status Card */}
-        <Card className={`border-l-4 ${
-          attendanceStatus?.attendance_status === 'Present' ? 
-            'border-l-green-500 bg-gradient-to-br from-green-100/60 via-green-50/30 to-card shadow-green-100/20 shadow-lg' :
-          attendanceStatus?.attendance_status === 'Active' ? 
+        <Card className={`border-l-4 ${attendanceStatus?.attendance_status === 'Present' ?
+          'border-l-green-500 bg-gradient-to-br from-green-100/60 via-green-50/30 to-card shadow-green-100/20 shadow-lg' :
+          attendanceStatus?.attendance_status === 'Active' ?
             'border-l-blue-500 bg-gradient-to-br from-blue-100/60 via-blue-50/30 to-card shadow-blue-100/20 shadow-lg' :
-          attendanceStatus?.attendance_status === 'Half Day' ? 
-            'border-l-yellow-500 bg-gradient-to-br from-yellow-100/60 via-yellow-50/30 to-card shadow-yellow-100/20 shadow-lg' :
-          attendanceStatus?.attendance_status === 'On Leave' ? 
-            'border-l-orange-500 bg-gradient-to-br from-orange-100/60 via-orange-50/30 to-card shadow-orange-100/20 shadow-lg' :
-          'border-l-red-500 bg-gradient-to-br from-red-100/60 via-red-50/30 to-card shadow-red-100/20 shadow-lg'
-        }`}>
+            attendanceStatus?.attendance_status === 'Half Day' ?
+              'border-l-yellow-500 bg-gradient-to-br from-yellow-100/60 via-yellow-50/30 to-card shadow-yellow-100/20 shadow-lg' :
+              attendanceStatus?.attendance_status === 'On Leave' ?
+                'border-l-orange-500 bg-gradient-to-br from-orange-100/60 via-orange-50/30 to-card shadow-orange-100/20 shadow-lg' :
+                'border-l-red-500 bg-gradient-to-br from-red-100/60 via-red-50/30 to-card shadow-red-100/20 shadow-lg'
+          }`}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Attendance Status</p>
-                <p className={`text-lg font-bold ${
-                  attendanceStatus?.attendance_status === 'Present' ? 'text-green-600' :
+                <p className={`text-lg font-bold ${attendanceStatus?.attendance_status === 'Present' ? 'text-green-600' :
                   attendanceStatus?.attendance_status === 'Active' ? 'text-blue-600' :
-                  attendanceStatus?.attendance_status === 'Half Day' ? 'text-yellow-600' :
-                    attendanceStatus?.attendance_status === 'On Leave' ? 'text-orange-600' :
-                      'text-red-600'
+                    attendanceStatus?.attendance_status === 'Half Day' ? 'text-yellow-600' :
+                      attendanceStatus?.attendance_status === 'On Leave' ? 'text-orange-600' :
+                        'text-red-600'
                   }`}>
                   {attendanceStatus?.attendance_status || 'Absent'}
                 </p>
@@ -937,19 +932,17 @@ export function AttendanceClockCard() {
                       "No check-in today"}
                 </p>
               </div>
-              <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${
-                attendanceStatus?.attendance_status === 'Present' ? 'bg-green-100' :
+              <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${attendanceStatus?.attendance_status === 'Present' ? 'bg-green-100' :
                 attendanceStatus?.attendance_status === 'Active' ? 'bg-blue-100' :
-                attendanceStatus?.attendance_status === 'Half Day' ? 'bg-yellow-100' :
-                  attendanceStatus?.attendance_status === 'On Leave' ? 'bg-orange-100' :
-                    'bg-red-100'
+                  attendanceStatus?.attendance_status === 'Half Day' ? 'bg-yellow-100' :
+                    attendanceStatus?.attendance_status === 'On Leave' ? 'bg-orange-100' :
+                      'bg-red-100'
                 }`}>
-                <Clock className={`h-6 w-6 ${
-                  attendanceStatus?.attendance_status === 'Present' ? 'text-green-600' :
+                <Clock className={`h-6 w-6 ${attendanceStatus?.attendance_status === 'Present' ? 'text-green-600' :
                   attendanceStatus?.attendance_status === 'Active' ? 'text-blue-600' :
-                  attendanceStatus?.attendance_status === 'Half Day' ? 'text-yellow-600' :
-                    attendanceStatus?.attendance_status === 'On Leave' ? 'text-orange-600' :
-                      'text-red-600'
+                    attendanceStatus?.attendance_status === 'Half Day' ? 'text-yellow-600' :
+                      attendanceStatus?.attendance_status === 'On Leave' ? 'text-orange-600' :
+                        'text-red-600'
                   }`} />
               </div>
             </div>
@@ -958,11 +951,10 @@ export function AttendanceClockCard() {
       </div>
 
       {/* Action Card */}
-      <Card className={`border-l-4 relative overflow-hidden ${getBorderColor()} ${
-        attendanceStatus?.is_checked_in && !dayEnded ? 'bg-gradient-to-br from-green-100/70 via-green-50/40 to-card shadow-green-100/20 shadow-lg' :
+      <Card className={`border-l-4 relative overflow-hidden ${getBorderColor()} ${attendanceStatus?.is_checked_in && !dayEnded ? 'bg-gradient-to-br from-green-100/70 via-green-50/40 to-card shadow-green-100/20 shadow-lg' :
         isOnBreak && !dayEnded ? 'bg-gradient-to-br from-yellow-100/70 via-yellow-50/40 to-card shadow-yellow-100/20 shadow-lg' :
-        'bg-gradient-to-br from-card to-muted/20'
-      }`}>
+          'bg-white'
+        }`}>
         {/* Color overlay for active states */}
         {attendanceStatus?.is_checked_in && !dayEnded && (
           <div className="absolute inset-0 bg-gradient-to-br from-green-200/20 via-transparent to-transparent pointer-events-none" />
@@ -970,7 +962,7 @@ export function AttendanceClockCard() {
         {isOnBreak && !dayEnded && (
           <div className="absolute inset-0 bg-gradient-to-br from-yellow-200/20 via-transparent to-transparent pointer-events-none" />
         )}
-        
+
         <CardHeader className="relative z-10">
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
@@ -1057,11 +1049,11 @@ export function AttendanceClockCard() {
               /* End Break Button - When on break */
               <Button
                 onClick={handleEndBreak}
-                size="sm"
-                className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-6"
+                size="lg"
+                className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
                 disabled={isLoading}
               >
-                <LogIn className="mr-2 h-4 w-4" />
+                <LogIn className="mr-2 h-5 w-5" />
                 {isLoading ? "Ending Break..." : "End Break"}
               </Button>
             ) : attendanceStatus?.is_checked_in && !isOnBreak && !dayEnded ? (
@@ -1069,20 +1061,20 @@ export function AttendanceClockCard() {
               <>
                 <Button
                   onClick={handleStartBreak}
-                  size="sm"
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-6"
+                  size="lg"
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
                   disabled={isLoading}
                 >
-                  <Coffee className="mr-2 h-4 w-4" />
+                  <Coffee className="mr-2 h-5 w-5" />
                   {isLoading ? "Starting Break..." : "Start Break"}
                 </Button>
                 <Button
                   onClick={handleEndOfDay}
-                  size="sm"
-                  className="bg-red-600 hover:bg-red-700 text-white border-0 px-6"
+                  size="lg"
+                  className="bg-red-600 hover:bg-red-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
                   disabled={isLoading}
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <LogOut className="mr-2 h-5 w-5" />
                   {isLoading ? "Ending Day..." : "End of Day"}
                 </Button>
               </>
@@ -1090,11 +1082,11 @@ export function AttendanceClockCard() {
               /* Check In Button - When not checked in */
               <Button
                 onClick={handleClockIn}
-                size="sm"
-                className="bg-green-600 hover:bg-green-700 text-white border-0 px-6"
+                size="lg"
+                className="bg-green-600 hover:bg-green-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
                 disabled={isLoading || attendanceStatus?.is_on_leave}
               >
-                <LogIn className="mr-2 h-4 w-4" />
+                <LogIn className="mr-2 h-5 w-5" />
                 {isLoading ? "Checking In..." : "Check In"}
               </Button>
             ) : null}

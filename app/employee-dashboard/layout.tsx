@@ -8,7 +8,7 @@ export default function EmployeeDashboardLayoutPage({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white">
       {/* Fixed Sidebar */}
       <EmployeeNav />
 
@@ -18,7 +18,7 @@ export default function EmployeeDashboardLayoutPage({
         <EmployeeHeader />
 
         {/* Scrollable Content */}
-        <main className="min-h-[calc(100vh-4rem)] bg-white p-4 md:p-6">
+        <main className="min-h-[calc(100vh-4rem)] bg-white p-4 md:p-6 employee-dashboard-main" style={{ background: '#ffffff !important' }}>
           {children}
         </main>
       </div>
