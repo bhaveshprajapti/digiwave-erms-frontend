@@ -14,10 +14,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Bell, LogOut, Settings, User } from "lucide-react"
 import { useEffect, useState } from "react"
 import { MobileNav } from "./mobile-nav"
+import { useSidebar } from "@/contexts/sidebar-context"
+import { AnimatedHamburger } from "@/components/ui/animated-hamburger"
 import authService, { type User as AuthUser } from "@/lib/auth"
 
 export function DashboardHeader() {
   const router = useRouter()
+  const { toggle, isOpen } = useSidebar()
   const [user, setUser] = useState<AuthUser | null>(null)
   // Keep display strings in state to avoid SSR/client hydration mismatches
   const [displayName, setDisplayName] = useState<string>('User')
@@ -43,7 +46,20 @@ export function DashboardHeader() {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
       <div className="flex items-center gap-4">
+        {/* Hamburger menu for mobile */}
         <MobileNav />
+        
+        {/* Hamburger menu for desktop sidebar toggle */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={toggle}
+          className="hidden md:flex items-center justify-center"
+          title={isOpen ? "Close Sidebar" : "Open Sidebar"}
+        >
+          <AnimatedHamburger isOpen={!isOpen} size={20} />
+        </Button>
+        
         <div>
           <h1 className="text-base font-semibold md:text-lg">Welcome back, {displayName}</h1>
           <p className="hidden text-sm text-muted-foreground sm:block">{user?.organization?.name || user?.role?.name || 'Employee'}</p>

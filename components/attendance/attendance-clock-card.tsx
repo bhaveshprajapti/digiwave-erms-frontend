@@ -10,7 +10,7 @@ import { checkIn, startBreak, endBreak, endOfDay, getAttendanceStatus, Attendanc
 import { getMyLeaveApplications } from "@/lib/api/leave-requests"
 import authService from "@/lib/auth"
 import api from "@/lib/api"
-import { attendanceEvents } from "@/hooks/use-attendance-updates"
+import { attendanceEvents, useAttendanceUpdates } from "@/hooks/use-attendance-updates"
 import Swal from 'sweetalert2'
 
 // Helper functions for secure user-specific localStorage
@@ -161,36 +161,66 @@ export function AttendanceClockCard() {
     })
   }
 
-  // Load attendance status
+  // Load attendance status - BACKEND IS SOURCE OF TRUTH
   const loadAttendanceStatus = async () => {
     try {
       const status = await getAttendanceStatus()
-      console.log('Loading attendance status:', status)
+      console.log('Loading attendance status from backend (source of truth):', status)
 
-      setAttendanceStatus(status)
-      setIsOnBreak(status.is_on_break || false)
-      setDayEnded(status.day_ended || false)
+      // CRITICAL: Backend state is the ONLY source of truth
+      // SAFEGUARD: Ensure boolean values (fix for array/truthy issues)
+      const safeStatus = {
+        ...status,
+        is_checked_in: Boolean(status.is_checked_in),
+        is_on_break: Boolean(status.is_on_break),
+        day_ended: Boolean(status.day_ended)
+      }
 
-      // Clear any user-specific localStorage states first
+      setAttendanceStatus(safeStatus)
+      setIsOnBreak(safeStatus.is_on_break)
+      setDayEnded(safeStatus.day_ended)
+
+      console.log('🔄 Attendance status updated:', {
+        raw_is_checked_in: status.is_checked_in,
+        raw_type: typeof status.is_checked_in,
+        safe_is_checked_in: Boolean(status.is_checked_in),
+        is_on_break: Boolean(status.is_on_break),
+        day_ended: Boolean(status.day_ended),
+        localIsOnBreak: Boolean(status.is_on_break),
+        localDayEnded: Boolean(status.day_ended)
+      })
+
+      // Clear any conflicting localStorage states - backend overrides everything
       clearUserSpecificStorage()
 
-      // Set current session start time if checked in and not on break
+      // CRITICAL: After admin reset, clear ALL localStorage for current user
+      // This ensures no stale state interferes with the reset
+      if (!status.is_checked_in && !status.is_on_break && !status.day_ended) {
+        removeUserSpecificStorage('breakStartTime')
+        console.log('Cleared all user-specific storage after potential admin reset')
+      }
+
+      // Set UI state based ONLY on backend response
       if (status.is_checked_in && status.last_check_in && !status.is_on_break) {
+        // Backend confirms user is checked in and working
         setCurrentSessionStart(new Date(status.last_check_in))
         setBreakStartTime(null)
-        console.log('User is checked in and working')
+        removeUserSpecificStorage('breakStartTime') // Clear any stale local data
+        console.log('Backend confirms: User is checked in and working')
       } else if (status.is_on_break && status.break_start_time) {
-        // User is on break
+        // Backend confirms user is on break
         const breakStart = new Date(status.break_start_time)
         setBreakStartTime(breakStart)
         setCurrentSessionStart(null) // Clear working session when on break
+        // Only store in localStorage for timer continuity, but backend is still source of truth
         setUserSpecificStorage('breakStartTime', breakStart.toISOString())
-        console.log('User is on break')
+        console.log('Backend confirms: User is on break')
       } else {
-        // User is not checked in
+        // Backend confirms user is not checked in or day ended
         setCurrentSessionStart(null)
         setBreakStartTime(null)
-        console.log('User is not checked in')
+        removeUserSpecificStorage('breakStartTime') // Clear any stale local data
+        console.log('Backend confirms: User is not checked in or day ended')
 
         // Set static working hours when not checked in
         const totalHours = status.total_hours || "0:00:00"
@@ -198,13 +228,14 @@ export function AttendanceClockCard() {
         setLiveWorkingTime(cleanTime)
       }
     } catch (error: any) {
-      console.error('Error loading attendance status:', error)
-      // Reset states on error
+      console.error('Error loading attendance status from backend:', error)
+      // On error, reset to safe state and clear potentially stale local data
       setAttendanceStatus(null)
       setIsOnBreak(false)
       setDayEnded(false)
       setCurrentSessionStart(null)
       setBreakStartTime(null)
+      removeUserSpecificStorage('breakStartTime')
     }
   }
 
@@ -497,7 +528,22 @@ export function AttendanceClockCard() {
     return () => clearInterval(timer)
   }, [currentSessionStart, attendanceStatus?.is_checked_in, attendanceStatus?.total_hours, breakStartTime, attendanceStatus?.total_break_time, isOnBreak])
 
-  // No automatic status refresh - only update on events
+  // CRITICAL: Listen to attendance events (admin reset, etc.)
+  useAttendanceUpdates(() => {
+    console.log('🔄 Attendance event received - force refreshing status')
+    // Force clear all state before refreshing
+    setAttendanceStatus(null)
+    setIsOnBreak(false)
+    setDayEnded(false)
+    setCurrentSessionStart(null)
+    setBreakStartTime(null)
+    // Clear any localStorage
+    removeUserSpecificStorage('breakStartTime')
+    // Then load fresh status
+    loadAttendanceStatus()
+  })
+
+
 
   // Initialize working time when attendance status changes
   useEffect(() => {
@@ -563,6 +609,18 @@ export function AttendanceClockCard() {
 
     } catch (error: any) {
       console.error('Check-in error:', error)
+
+      // Handle session expiration
+      if (error?.response?.status === 401 || error?.response?.data?.session_expired) {
+        toast({
+          title: "Session Expired",
+          description: "Your session has expired. Please log in again to continue.",
+          variant: "destructive",
+        })
+        authService.logout()
+        return
+      }
+
       toast({
         title: "Error",
         description: error?.response?.data?.detail || "Failed to check in",
@@ -576,11 +634,21 @@ export function AttendanceClockCard() {
   const handleStartBreak = async () => {
     if (isLoading) return
 
+    // CRITICAL: Double-check backend state before allowing break
+    console.log('🔍 Start break clicked - checking current state:', {
+      attendanceStatus_is_checked_in: attendanceStatus?.is_checked_in,
+      local_isOnBreak: isOnBreak,
+      local_dayEnded: dayEnded
+    })
+
+    // Force refresh status before starting break
+    await loadAttendanceStatus()
+
     // Validate state before starting break
     if (!attendanceStatus?.is_checked_in) {
       toast({
         title: "Error",
-        description: "You must be checked in to start a break",
+        description: "You must be checked in to start a break. Please check in first.",
         variant: "destructive"
       })
       return
@@ -626,6 +694,18 @@ export function AttendanceClockCard() {
 
     } catch (error: any) {
       console.error('Start break error:', error)
+
+      // Handle session expiration
+      if (error?.response?.status === 401 || error?.response?.data?.session_expired) {
+        toast({
+          title: "Session Expired",
+          description: "Your session has expired. Please log in again to continue.",
+          variant: "destructive",
+        })
+        authService.logout()
+        return
+      }
+
       toast({
         title: "Error",
         description: error?.response?.data?.detail || "Failed to start break",
@@ -668,6 +748,18 @@ export function AttendanceClockCard() {
 
     } catch (error: any) {
       console.error('End break error:', error)
+
+      // Handle session expiration
+      if (error?.response?.status === 401 || error?.response?.data?.session_expired) {
+        toast({
+          title: "Session Expired",
+          description: "Your session has expired. Please log in again to continue.",
+          variant: "destructive",
+        })
+        authService.logout()
+        return
+      }
+
       toast({
         title: "Error",
         description: error?.response?.data?.detail || "Failed to end break",
@@ -740,6 +832,18 @@ export function AttendanceClockCard() {
 
     } catch (error: any) {
       console.error('End of day error:', error)
+
+      // Handle session expiration
+      if (error?.response?.status === 401 || error?.response?.data?.session_expired) {
+        toast({
+          title: "Session Expired",
+          description: "Your session has expired. Please log in again to continue.",
+          variant: "destructive",
+        })
+        authService.logout()
+        return
+      }
+
       toast({
         title: "Error",
         description: error?.response?.data?.detail || "Failed to end day",
@@ -818,7 +922,7 @@ export function AttendanceClockCard() {
   return (
     <div className="space-y-6">
       {/* Main Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         {/* Working Hours Card - Dynamic Colors */}
         <Card className={`border-l-4 ${getBorderColor()} hover:shadow-md ${dayEnded ? 'bg-white' :
           attendanceStatus?.is_checked_in ? 'bg-gradient-to-br from-green-100/60 via-green-50/30 to-card shadow-green-100/20 shadow-lg' :
@@ -837,7 +941,7 @@ export function AttendanceClockCard() {
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <p className="text-sm font-medium text-muted-foreground">Today's Hours</p>
-                <p className={`text-3xl font-bold ${getTextColor()} font-mono tracking-wide`}>
+                <p className={`text-xl sm:text-2xl lg:text-3xl font-bold ${getTextColor()} font-mono tracking-wide`}>
                   {isMounted ? liveWorkingTime : "00:00:00"}
                 </p>
                 <p className="text-xs text-muted-foreground mt-2">
@@ -967,6 +1071,7 @@ export function AttendanceClockCard() {
           <CardTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
             Quick Actions
+
             {dayEnded && (
               <div className="ml-auto flex items-center gap-2 text-sm text-gray-600">
                 <div className="h-2 w-2 bg-gray-500 rounded-full" />
@@ -1028,8 +1133,10 @@ export function AttendanceClockCard() {
             </div>
           </div>
 
+
+
           {/* Action Buttons */}
-          <div className="flex justify-end gap-2">
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
             {dayEnded ? (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                 <div className="flex items-center gap-2 text-gray-700">
@@ -1050,7 +1157,7 @@ export function AttendanceClockCard() {
               <Button
                 onClick={handleEndBreak}
                 size="lg"
-                className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
+                className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-4 py-2 sm:px-8 sm:py-3 h-10 sm:h-12 cursor-pointer text-sm sm:text-base w-full sm:w-auto"
                 disabled={isLoading}
               >
                 <LogIn className="mr-2 h-5 w-5" />
@@ -1062,7 +1169,7 @@ export function AttendanceClockCard() {
                 <Button
                   onClick={handleStartBreak}
                   size="lg"
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white border-0 px-4 py-2 sm:px-8 sm:py-3 h-10 sm:h-12 cursor-pointer text-sm sm:text-base w-full sm:w-auto"
                   disabled={isLoading}
                 >
                   <Coffee className="mr-2 h-5 w-5" />
@@ -1071,7 +1178,7 @@ export function AttendanceClockCard() {
                 <Button
                   onClick={handleEndOfDay}
                   size="lg"
-                  className="bg-red-600 hover:bg-red-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
+                  className="bg-red-600 hover:bg-red-700 text-white border-0 px-4 py-2 sm:px-8 sm:py-3 h-10 sm:h-12 cursor-pointer text-sm sm:text-base w-full sm:w-auto"
                   disabled={isLoading}
                 >
                   <LogOut className="mr-2 h-5 w-5" />
@@ -1083,7 +1190,7 @@ export function AttendanceClockCard() {
               <Button
                 onClick={handleClockIn}
                 size="lg"
-                className="bg-green-600 hover:bg-green-700 text-white border-0 px-8 py-3 h-12 cursor-pointer"
+                className="bg-green-600 hover:bg-green-700 text-white border-0 px-4 py-2 sm:px-8 sm:py-3 h-10 sm:h-12 cursor-pointer text-sm sm:text-base w-full sm:w-auto"
                 disabled={isLoading || attendanceStatus?.is_on_leave}
               >
                 <LogIn className="mr-2 h-5 w-5" />

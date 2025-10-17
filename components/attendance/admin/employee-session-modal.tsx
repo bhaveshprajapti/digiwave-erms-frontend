@@ -100,9 +100,9 @@ export function EmployeeSessionModal({
         
         setTotalBreakTime(calculateTotalBreakTime())
         
-        // Check if day has ended (last session has check_out)
-        const lastSession = sessions[sessions.length - 1]
-        setDayEnded(sessions.length > 0 && lastSession?.check_out !== null)
+        // CRITICAL: Check day_ended from database, not just session state
+        // The day_ended field is the authoritative source of truth
+        setDayEnded(attendanceData.day_ended || false)
       } else {
         // No attendance data for this date
         setAttendance(null)

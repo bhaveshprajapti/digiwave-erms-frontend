@@ -11,14 +11,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Bell, LogOut, Settings, User } from "lucide-react"
+import { Bell, LogOut, Settings, User, Menu } from "lucide-react"
 import { useEffect, useState } from "react"
 import { MobileNav } from "./mobile-nav"
+import { useSidebar } from "@/contexts/sidebar-context"
 import authService, { type User as AuthUser } from "@/lib/auth"
 import { employeeNavigationSections } from "@/components/layout/employee-navigation"
 
 export function EmployeeHeader() {
   const router = useRouter()
+  const { toggle } = useSidebar()
   const [user, setUser] = useState<AuthUser | null>(null)
   const [displayName, setDisplayName] = useState<string>('User')
   const [fullName, setFullName] = useState<string>('User')
@@ -39,7 +41,20 @@ export function EmployeeHeader() {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
       <div className="flex items-center gap-4">
+        {/* Hamburger menu for mobile */}
         <MobileNav sections={employeeNavigationSections} />
+        
+        {/* Hamburger menu for desktop sidebar toggle */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={toggle}
+          className="hidden md:flex"
+          title="Toggle Sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        
         <div>
           <h1 className="text-base font-semibold md:text-lg">Welcome back, {displayName}</h1>
           <p className="hidden text-sm text-muted-foreground sm:block">{user?.organization?.name || user?.role?.name || 'Employee'}</p>

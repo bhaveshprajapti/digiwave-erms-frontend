@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import {
-  Building2,
   ChevronDown,
   ChevronRight,
 } from "lucide-react"
+import { useSidebar } from "@/contexts/sidebar-context"
 
 // Navigation structure imported to keep mobile and desktop in sync
 import { navigationSections } from "@/components/layout/navigation"
@@ -95,9 +95,12 @@ isActive
 
 export function DashboardNav() {
   const pathname = usePathname()
+  const { isOpen } = useSidebar()
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card transition-transform md:translate-x-0 hidden md:block">
+    <aside className={`fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card transition-transform duration-300 ${
+      isOpen ? 'translate-x-0' : '-translate-x-full'
+    } hidden md:block`}>
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b px-6">
         <img src="/digiwave-logo.png" alt="Digiwave" className="h-8 w-auto" />

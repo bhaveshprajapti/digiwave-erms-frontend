@@ -4,8 +4,9 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
-import { Building2, ChevronDown, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { employeeNavigationSections } from "@/components/layout/employee-navigation"
+import { useSidebar } from "@/contexts/sidebar-context"
 
 function normalizePath(p?: string) {
   if (!p) return ''
@@ -87,9 +88,12 @@ isActive
 
 export function EmployeeNav() {
   const pathname = usePathname()
+  const { isOpen } = useSidebar()
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card transition-transform md:translate-x-0 hidden md:block">
+    <aside className={`fixed left-0 top-0 z-40 h-screen w-64 border-r bg-card transition-transform duration-300 ${
+      isOpen ? 'translate-x-0' : '-translate-x-full'
+    } hidden md:block`}>
       <div className="flex h-16 items-center gap-2 border-b px-6">
         <img src="/digiwave-logo.png" alt="Digiwave" className="h-8 w-auto" />
         <span className="font-semibold text-lg">Digiwave</span>

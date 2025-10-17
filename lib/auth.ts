@@ -176,9 +176,18 @@ class AuthService {
     }
   }
 
-  logout(): void {
-    // Don't clear attendance data - user should be able to continue their session after re-login
+  async logout(): Promise<void> {
+    try {
+      // Log the logout event on the backend for session management
+      await api.post('/accounts/logout', {})
+    } catch (error) {
+      // Continue with logout even if backend call fails
+      console.warn('Failed to log logout event:', error)
+    }
+    
+    // Clear tokens and user data
     this.removeTokens()
+    
     // Redirect to login page
     if (typeof window !== 'undefined') {
       window.location.href = '/login'

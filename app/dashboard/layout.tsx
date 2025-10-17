@@ -1,19 +1,20 @@
+"use client"
+
 import type React from "react"
 import { DashboardNav } from "@/components/layout/dashboard-nav"
 import { DashboardHeader } from "@/components/layout/dashboard-header"
+import { SidebarProvider, useSidebar } from "@/contexts/sidebar-context"
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function DashboardContent({ children }: { children: React.ReactNode }) {
+  const { isOpen } = useSidebar()
+
   return (
     <div className="min-h-screen bg-background">
       {/* Fixed Sidebar */}
       <DashboardNav />
       
       {/* Main Content Area */}
-      <div className="md:ml-64">
+      <div className={`transition-all duration-300 ${isOpen ? 'md:ml-64' : 'md:ml-0'}`}>
         {/* Fixed Header */}
         <DashboardHeader />
         
@@ -23,5 +24,17 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
+  )
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <SidebarProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </SidebarProvider>
   )
 }

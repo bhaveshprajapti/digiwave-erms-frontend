@@ -4,8 +4,8 @@ import { AttendanceHistory } from "@/components/attendance/attendance-history"
 
 export default function EmployeeAttendancePage() {
   return (
-    <div className="space-y-6 bg-white" style={{ background: '#ffffff !important' }}>
-      <div>
+    <div className="space-y-6">
+      <div className="bg-white p-0">
         <h1 className="text-3xl font-bold tracking-tight">My Attendance</h1>
       </div>
       <AttendanceClockCard />

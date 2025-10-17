@@ -1,19 +1,20 @@
+"use client"
+
 import type React from "react"
 import { EmployeeNav } from "@/components/layout/employee-nav"
 import { EmployeeHeader } from "@/components/layout/employee-header"
+import { SidebarProvider, useSidebar } from "@/contexts/sidebar-context"
 
-export default function EmployeeDashboardLayoutPage({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function EmployeeDashboardContent({ children }: { children: React.ReactNode }) {
+  const { isOpen } = useSidebar()
+
   return (
     <div className="min-h-screen bg-white">
       {/* Fixed Sidebar */}
       <EmployeeNav />
 
       {/* Main Content Area */}
-      <div className="md:ml-64">
+      <div className={`transition-all duration-300 ${isOpen ? 'md:ml-64' : 'md:ml-0'}`}>
         {/* Fixed Header */}
         <EmployeeHeader />
 
@@ -23,5 +24,17 @@ export default function EmployeeDashboardLayoutPage({
         </main>
       </div>
     </div>
+  )
+}
+
+export default function EmployeeDashboardLayoutPage({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <SidebarProvider>
+      <EmployeeDashboardContent>{children}</EmployeeDashboardContent>
+    </SidebarProvider>
   )
 }
