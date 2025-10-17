@@ -16,12 +16,12 @@ interface DateRangePickerProps {
   minDate?: Date
 }
 
-export function DateRangePicker({ 
-  start, 
-  end, 
-  onChangeStart, 
-  onChangeEnd, 
-  className, 
+export function DateRangePicker({
+  start,
+  end,
+  onChangeStart,
+  onChangeEnd,
+  className,
   useIST = true,
   disabled = false,
   maxDate,
