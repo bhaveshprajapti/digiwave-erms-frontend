@@ -1,4 +1,5 @@
-import { LeaveRequestForm } from "@/components/leave/leave-request-form"
+"use client"
+
 import { LeaveBalanceCard } from "@/components/leave/leave-balance-card"
 import { LeaveRequestList } from "@/components/leave/leave-request-list"
 import { LeaveLayout } from "@/components/leave/leave-layout"
@@ -11,18 +12,13 @@ export default function EmployeeLeavePage() {
           <h1 className="text-3xl font-bold tracking-tight">My Leave Requests</h1>
         </div>
 
-        {/* Leave Balances - count cards first */}
+        {/* Leave Balances */}
         <div>
           <h2 className="text-lg font-semibold mb-4">Leave Balances</h2>
           <LeaveBalanceCard />
         </div>
 
-        {/* Apply Leave - form second */}
-        <div>
-          <LeaveRequestForm />
-        </div>
-
-        {/* Applied Leave - table third */}
+        {/* Applied Leave */}
         <div>
           <LeaveRequestList />
         </div>

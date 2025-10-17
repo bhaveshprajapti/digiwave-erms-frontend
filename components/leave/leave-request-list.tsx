@@ -11,11 +11,13 @@ import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { ActionButtons } from "@/components/common/action-buttons"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react"
+import { CheckCircle, XCircle, Clock, AlertTriangle, Plus } from "lucide-react"
 import { formatUTCtoISTDate, getISTDateString } from "@/lib/timezone"
 import { useLeaveRequestsContext } from "@/contexts/leave-requests-context"
 import { leaveEvents } from "@/hooks/use-leave-updates"
+import { LeaveRequestModal } from "./leave-request-modal"
 
 // Duration calculation function (EXACTLY like backend Django model)
 function calculateDuration(startDate: string, endDate: string): number {
@@ -111,6 +113,7 @@ export function LeaveRequestList() {
   const [typesMap, setTypesMap] = useState<Record<number, string>>({})
   const [selected, setSelected] = useState<any | null>(null)
   const [open, setOpen] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
   const [flexibleTimingRequests, setFlexibleTimingRequests] = useState<any[]>([])
   const { toast } = useToast()
 
@@ -147,7 +150,7 @@ export function LeaveRequestList() {
     return allRequests.filter(r => {
       // Filter by user (leave requests) or current user (flexible timing)
       if (r.request_type !== 'flexible-timing' && r.user !== userId) return false
-      
+
       // Filter by date range using IST dates
       const requestDate = r.start_date
       if (start && requestDate < getISTDateString(start)) return false
@@ -173,10 +176,10 @@ export function LeaveRequestList() {
         const map: Record<number, string> = {}
         types.forEach((t: any) => { map[t.id] = t.name })
         setTypesMap(map)
-        
+
         // Load requests into context - force refresh to get latest status
         await refreshAll()
-        
+
         // Load flexible timing requests
         await fetchFlexibleTimingRequests()
       } catch (e: any) {
@@ -217,26 +220,30 @@ export function LeaveRequestList() {
         <CardHeader className="flex items-start justify-between gap-3">
           <CardTitle>My Leave Requests & Flexible Timing</CardTitle>
           <div className="flex items-center gap-2">
-            <DateRangePicker 
-              start={start} 
-              end={end} 
-              onChangeStart={setStart} 
+            <DateRangePicker
+              start={start}
+              end={end}
+              onChangeStart={setStart}
               onChangeEnd={setEnd}
               useIST={true}
             />
+            <Button onClick={() => setModalOpen(true)} size="default" className="gap-2 whitespace-nowrap">
+              <Plus className="h-4 w-4" />
+              Request Leave
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
           <DataTable<any>
             columns={[
               { key: 'sr', header: 'Sr No.', cell: (_r, i) => <span className="font-medium">{i + 1}</span>, className: 'w-16' },
-              { 
-                key: 'request_type', 
-                header: 'Request Type', 
+              {
+                key: 'request_type',
+                header: 'Request Type',
                 cell: (r) => {
                   const typeMap = {
                     'full-day': 'Full Day Leave',
-                    'half-day': 'Half Day Leave', 
+                    'half-day': 'Half Day Leave',
                     'flexible-timing': 'Flexible Timing'
                   }
                   return (
@@ -246,76 +253,80 @@ export function LeaveRequestList() {
                   )
                 }
               },
-              { key: 'leave', header: 'Type/Category', cell: (r) => (
-                <button className="text-primary hover:underline font-medium" onClick={() => { setSelected(r); setOpen(true) }}>
-                  {(r as any).leave_type_name || typesMap[(r as any).leave_type] || 'Unknown'}
-                </button>
-              )},
-              { 
-                key: 'start_date', 
-                header: 'Start Date', 
-                cell: (r) => formatDate((r as any).start_date),
-                sortable: true 
+              {
+                key: 'leave', header: 'Type/Category', cell: (r) => (
+                  <button className="text-primary hover:underline font-medium" onClick={() => { setSelected(r); setOpen(true) }}>
+                    {(r as any).leave_type_name || typesMap[(r as any).leave_type] || 'Unknown'}
+                  </button>
+                )
               },
-              { 
-                key: 'end_date', 
-                header: 'End Date', 
+              {
+                key: 'start_date',
+                header: 'Start Date',
+                cell: (r) => formatDate((r as any).start_date),
+                sortable: true
+              },
+              {
+                key: 'end_date',
+                header: 'End Date',
                 cell: (r) => formatDate((r as any).end_date),
               },
-              { 
-                key: 'duration', 
-                header: 'Duration', 
+              {
+                key: 'duration',
+                header: 'Duration',
                 cell: (r) => {
                   return (r as any).duration_display || `${(r as any).total_days || 0} days`
                 },
-                className: 'w-24' 
+                className: 'w-24'
               },
-              { 
-                key: 'status', 
-                header: 'Status', 
+              {
+                key: 'status',
+                header: 'Status',
                 cell: (r) => getStatusBadge((r as any).status)
               },
-              { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (r) => {
-                const request = r as any
-                const today = getISTDateString()
-                const startDate = request.start_date
-                
-                // User can delete if it's pending and before start date
-                const canUserDelete = (request.status === 'pending' || request.status === 'draft' || request.status === 1 || !request.status) && startDate > today
-                
-                return (
-                  <div className="flex items-center justify-center">
-                    <ActionButtons
-                      extras={[{ title: 'View', onClick: () => { setSelected(r); setOpen(true) } }]}
-                      onDelete={canUserDelete ? async () => {
-                        try {
-                          if (request.request_type === 'flexible-timing') {
-                            await deleteFlexibleTimingRequest(request.id)
-                            toast({ title: 'Deleted', description: 'Flexible timing request deleted successfully.' })
-                            // Refresh flexible timing requests
-                            await fetchFlexibleTimingRequests()
-                            // Dispatch event for real-time updates
-                            leaveEvents.requestDeleted(request.id, userId || 0)
-                          } else {
-                            await deleteLeaveRequest(request.id)
-                            toast({ title: 'Deleted', description: 'Leave request deleted successfully.' })
-                            // Remove from context and refresh
-                            removeRequest(request.id)
-                            // Dispatch event for real-time updates
-                            leaveEvents.requestDeleted(request.id, userId || 0)
-                            await refreshAll()
+              {
+                key: 'actions', header: <span className="block text-center">Actions</span>, cell: (r) => {
+                  const request = r as any
+                  const today = getISTDateString()
+                  const startDate = request.start_date
+
+                  // User can delete if it's pending and before start date
+                  const canUserDelete = (request.status === 'pending' || request.status === 'draft' || request.status === 1 || !request.status) && startDate > today
+
+                  return (
+                    <div className="flex items-center justify-center">
+                      <ActionButtons
+                        extras={[{ title: 'View', onClick: () => { setSelected(r); setOpen(true) } }]}
+                        onDelete={canUserDelete ? async () => {
+                          try {
+                            if (request.request_type === 'flexible-timing') {
+                              await deleteFlexibleTimingRequest(request.id)
+                              toast({ title: 'Deleted', description: 'Flexible timing request deleted successfully.' })
+                              // Refresh flexible timing requests
+                              await fetchFlexibleTimingRequests()
+                              // Dispatch event for real-time updates
+                              leaveEvents.requestDeleted(request.id, userId || 0)
+                            } else {
+                              await deleteLeaveRequest(request.id)
+                              toast({ title: 'Deleted', description: 'Leave request deleted successfully.' })
+                              // Remove from context and refresh
+                              removeRequest(request.id)
+                              // Dispatch event for real-time updates
+                              leaveEvents.requestDeleted(request.id, userId || 0)
+                              await refreshAll()
+                            }
+                          } catch (e: any) {
+                            toast({ title: 'Error', description: e?.response?.data?.detail || e?.message || 'Failed to delete', variant: 'destructive' })
                           }
-                        } catch (e: any) {
-                          toast({ title: 'Error', description: e?.response?.data?.detail || e?.message || 'Failed to delete', variant: 'destructive' })
-                        }
-                      } : undefined}
-                    />
-                  </div>
-                )
-              }},
+                        } : undefined}
+                      />
+                    </div>
+                  )
+                }
+              },
             ]}
             data={filteredRows}
-            getRowKey={(r)=> (r as any).unique_key || `${(r as any).request_type}-${(r as any).id}`}
+            getRowKey={(r) => (r as any).unique_key || `${(r as any).request_type}-${(r as any).id}`}
             striped
           />
         </CardContent>
@@ -357,12 +368,12 @@ export function LeaveRequestList() {
                   <p className="mt-1">{selected.applied_at ? formatDate(selected.applied_at) : selected.created_at ? formatDate(selected.created_at) : 'N/A'}</p>
                 </div>
               </div>
-              
+
               <div>
                 <span className="text-muted-foreground font-medium">Reason:</span>
                 <p className="mt-1 p-2 bg-gray-50 rounded whitespace-pre-wrap">{selected.reason || 'N/A'}</p>
               </div>
-              
+
               {selected.rejection_reason && (
                 <div>
                   <span className="text-muted-foreground font-medium text-red-600">Rejection Reason:</span>
@@ -373,6 +384,8 @@ export function LeaveRequestList() {
           )}
         </DialogContent>
       </Dialog>
+
+      <LeaveRequestModal open={modalOpen} onOpenChange={setModalOpen} />
     </>
   )
 }

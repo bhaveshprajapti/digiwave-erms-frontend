@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { DatePicker } from "@/components/ui/date-picker"
 import { getAvailableLeaveTypes } from "@/lib/api/leave-types"
 import { createLeaveRequest } from "@/lib/api/leave-requests"
 import { authService } from "@/lib/auth"
@@ -23,121 +24,85 @@ import { leaveEvents } from "@/hooks/use-leave-updates"
 
 // Helper function to calculate duration (EXACTLY like backend Django model)
 function calculateDuration(startDate: string, endDate: string): number {
-  // Convert date strings to Date objects (same as Django)
   const start = new Date(startDate + 'T00:00:00')
   const end = new Date(endDate + 'T00:00:00')
-
-  // Calculate difference in days (same as Django: (end_date - start_date).days)
   const diffTime = end.getTime() - start.getTime()
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-
-  // Add 1 to include both start and end dates (same as Django: + 1)
-  return diffDays
+  return diffDays + 1
 }
 
 function daysBetweenInclusive(a?: Date, b?: Date): number {
   if (!a || !b) return 0
-
-  // Format dates as YYYY-MM-DD strings (same as backend format)
   const startDate = `${a.getFullYear()}-${String(a.getMonth() + 1).padStart(2, '0')}-${String(a.getDate()).padStart(2, '0')}`
   const endDate = `${b.getFullYear()}-${String(b.getMonth() + 1).padStart(2, '0')}-${String(b.getDate()).padStart(2, '0')}`
-
-  // Use the same calculation as backend Django model
   return calculateDuration(startDate, endDate)
 }
-export function LeaveRequestForm() {
+
+interface LeaveRequestFormProps {
+  defaultRequestType?: 'full-day' | 'half-day' | 'hourly'
+  onSuccess?: () => void
+  showTabs?: boolean
+}
+
+export function LeaveRequestForm({ defaultRequestType = 'full-day', onSuccess, showTabs = true }: LeaveRequestFormProps = {}) {
   const { toast } = useToast()
   const [types, setTypes] = useState<{ value: number; label: string; color: string }[]>([])
   const [leaveType, setLeaveType] = useState("")
   const [start, setStart] = useState<Date | undefined>()
   const [end, setEnd] = useState<Date | undefined>()
   const [reason, setReason] = useState("")
-  
-  // Half-day leave options
-  const [isHalfDay, setIsHalfDay] = useState(false)
   const [halfDayPeriod, setHalfDayPeriod] = useState<'morning' | 'afternoon'>('morning')
-  
-  // Hourly leave options
-  const [isHourlyLeave, setIsHourlyLeave] = useState(false)
   const [startTime, setStartTime] = useState("")
   const [endTime, setEndTime] = useState("")
   const [totalHours, setTotalHours] = useState(0)
-  
-  // Request type selection
-  const [requestType, setRequestType] = useState<'full-day' | 'half-day' | 'hourly' | 'flexible-timing'>('full-day')
-
-  // Sync isHalfDay state with requestType
-  useEffect(() => {
-    if (requestType === 'half-day') {
-      setIsHalfDay(true)
-    } else {
-      setIsHalfDay(false)
-    }
-  }, [requestType])
+  const [requestType, setRequestType] = useState<'full-day' | 'half-day' | 'hourly'>(defaultRequestType)
   const [emergencyContact, setEmergencyContact] = useState("")
   const [emergencyPhone, setEmergencyPhone] = useState("")
   const [workHandover, setWorkHandover] = useState("")
   const [attachment, setAttachment] = useState<File | null>(null)
   const [saving, setSaving] = useState(false)
-
-  // Use centralized state management
   const { requests: existingRequests, balances, refreshAll, addRequest } = useLeaveRequestsContext()
-
   const user = authService.getUserData()
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const typesData = await getAvailableLeaveTypes()
-
         setTypes(typesData.map((d: any) => ({
           value: d.id,
           label: `${d.name} (${d.code})`,
           color: d.color_code || '#007bff'
         })))
-
-        // Load initial data into context
         await refreshAll()
       } catch (error) {
         console.error('Failed to load data', error)
       }
     }
-
     fetchData()
   }, [refreshAll])
 
-  // Get available balance for selected leave type
   const getAvailableBalance = () => {
     if (!leaveType) return null
     const balance = balances.find(b => b.leave_type === Number(leaveType))
     return balance ? Number(balance.remaining_balance) || 0 : 0
   }
 
-  // Calculate hours between start and end time
   const calculateHours = (startTime: string, endTime: string): number => {
     if (!startTime || !endTime) return 0
-    
     const start = new Date(`2000-01-01T${startTime}:00`)
     const end = new Date(`2000-01-01T${endTime}:00`)
-    
     if (end <= start) return 0
-    
     const diffMs = end.getTime() - start.getTime()
-    return diffMs / (1000 * 60 * 60) // Convert to hours
+    return diffMs / (1000 * 60 * 60)
   }
 
-  // Calculate total days based on request type
   const calculateTotalDays = (): number => {
     if (requestType === 'half-day') return 0.5
-    if (requestType === 'hourly') return totalHours / 8 // Assuming 8-hour work day
-    if (requestType === 'flexible-timing') return 0 // Flexible timing doesn't use leave days
-    
-    // Full day calculation
+    if (requestType === 'hourly') return totalHours / 8
     if (!start || !end) return 0
-    return daysBetweenInclusive(start, end) + 1
+    return daysBetweenInclusive(start, end)
   }
 
-  // Update total hours when time changes
   useEffect(() => {
     if (requestType === 'hourly' && startTime && endTime) {
       const hours = calculateHours(startTime, endTime)
@@ -145,86 +110,58 @@ export function LeaveRequestForm() {
     }
   }, [startTime, endTime, requestType])
 
-  // Check for date conflicts with existing requests (any overlapping dates regardless of leave type)
   const hasDateConflict = () => {
     if (!start || !end) return false
-    
     const startDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`
     const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`
-    
     return existingRequests.some((request: any) => {
-      // Only check active requests (pending or approved)
       const status = request.status
       const isActive = status === 1 || status === 2 || status === 'pending' || status === 'approved' || status === 'draft' || !status
-      
       if (!isActive) return false
-      
       const requestStart = request.start_date
       const requestEnd = request.end_date
-      
-      // Check for date overlap (any overlapping dates regardless of leave type)
       return (startDate <= requestEnd && endDate >= requestStart)
     })
   }
 
-  // Get details of conflicting request for better error message
   const getConflictingRequest = () => {
     if (!start || !end) return null
-    
     const startDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`
     const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`
-    
     return existingRequests.find((request: any) => {
       const status = request.status
       const isActive = status === 1 || status === 2 || status === 'pending' || status === 'approved' || !status
-      
       if (!isActive) return false
-      
       const requestStart = request.start_date
       const requestEnd = request.end_date
-      
       return (startDate <= requestEnd && endDate >= requestStart)
     })
   }
 
-  // Validation messages
   const getValidationMessage = () => {
     if (!start || !end || !leaveType) return null
-    
     const requestedDays = daysBetweenInclusive(start, end)
     const availableBalance = getAvailableBalance()
-    
     if (availableBalance !== null && requestedDays > availableBalance) {
       return {
         type: 'error',
         message: `Insufficient balance! You have ${availableBalance} days available but requesting ${requestedDays} days.`
       }
     }
-    
     if (hasDateConflict()) {
       const conflictingRequest = getConflictingRequest()
       const conflictStart = conflictingRequest ? formatUTCtoISTDate(conflictingRequest.start_date + 'T00:00:00Z') : ''
       const conflictEnd = conflictingRequest ? formatUTCtoISTDate(conflictingRequest.end_date + 'T00:00:00Z') : ''
-      
-      // Get status name
       const getStatusName = (status: any) => {
-        if (typeof status === 'string') {
-          return status.toLowerCase()
-        }
-        return status === 1 ? 'pending' : 
-               status === 2 ? 'approved' : 
-               status === 3 ? 'rejected' : 
-               status === 4 ? 'cancelled' : 'pending'
+        if (typeof status === 'string') return status.toLowerCase()
+        return status === 1 ? 'pending' : status === 2 ? 'approved' : status === 3 ? 'rejected' : status === 4 ? 'cancelled' : 'pending'
       }
-      
       const statusName = getStatusName(conflictingRequest?.status)
-      
       return {
         type: 'error',
         message: `You already have a ${statusName} leave request from ${conflictStart} to ${conflictEnd} that overlaps with the selected dates. Please choose different dates.`
       }
     }
-    
     return {
       type: 'success',
       message: `Valid request: ${requestedDays} days will be deducted from your ${availableBalance || 0} available days.`
@@ -232,73 +169,56 @@ export function LeaveRequestForm() {
   }
 
   const submit = async () => {
-    if (!user?.id) { 
+    if (!user?.id) {
       toast({ title: 'Not logged in', variant: 'destructive' })
-      return 
+      return
     }
-    
-    if (!leaveType) { 
+    if (!leaveType) {
       toast({ title: 'Please select a leave type', variant: 'destructive' })
-      return 
+      return
     }
-    
-    // For half-day, ensure we have a leave type
-    if (requestType === 'half-day' && !leaveType) {
-      toast({ title: 'Leave type is required for half-day requests', variant: 'destructive' })
-      return 
-    }
-    
-    if (!start || !end) { 
+    if (!start || !end) {
       toast({ title: 'Please select date range', variant: 'destructive' })
-      return 
+      return
     }
-    
-    if ((requestType === 'half-day' || isHalfDay) && start && end && (start.getFullYear() !== end.getFullYear() || start.getMonth() !== end.getMonth() || start.getDate() !== end.getDate())) {
+    if (requestType === 'half-day' && start && end && (start.getFullYear() !== end.getFullYear() || start.getMonth() !== end.getMonth() || start.getDate() !== end.getDate())) {
       toast({ title: 'Half day leave must have same start and end date', variant: 'destructive' })
       return
     }
-    
     const diff = daysBetweenInclusive(start, end)
-    // For half-day, allow same date (diff could be 0)
     if (requestType === 'half-day') {
       if (diff < 0) {
         toast({ title: 'Invalid date range', variant: 'destructive' })
-        return 
+        return
       }
     } else {
-      if (diff <= 0) { 
+      if (diff <= 0) {
         toast({ title: 'Invalid date range', variant: 'destructive' })
-        return 
+        return
       }
     }
-    
-    // Check balance
     const availableBalance = getAvailableBalance()
     const requestedDays = requestType === 'half-day' ? 0.5 : diff
     if (availableBalance !== null && requestedDays > availableBalance) {
-      toast({ 
-        title: 'Insufficient Balance', 
+      toast({
+        title: 'Insufficient Balance',
         description: `You have ${availableBalance} days available but requesting ${requestedDays} days.`,
-        variant: 'destructive' 
+        variant: 'destructive'
       })
       return
     }
-    
-    // Check date conflicts
     if (hasDateConflict()) {
-      toast({ 
-        title: 'Date Conflict', 
+      toast({
+        title: 'Date Conflict',
         description: 'You already have a pending request for this leave type during the selected dates.',
-        variant: 'destructive' 
+        variant: 'destructive'
       })
       return
     }
-    
     if (!reason.trim()) {
       toast({ title: 'Please provide a reason', variant: 'destructive' })
       return
     }
-    
     setSaving(true)
     try {
       const requestData: any = {
@@ -311,52 +231,45 @@ export function LeaveRequestForm() {
         work_handover: workHandover.trim() || undefined,
         attachment: attachment || undefined,
       }
-
-      // Add fields based on request type
       if (requestType === 'half-day') {
         requestData.is_half_day = true
         requestData.half_day_period = halfDayPeriod
         requestData.total_days = 0.5
       } else {
-        // Full day leave
         requestData.is_half_day = false
         requestData.total_days = calculateTotalDays()
       }
-
       const newRequest = await createLeaveRequest(requestData)
-      
-      toast({ 
-        title: 'Success', 
-        description: 'Your leave request has been submitted successfully.' 
+      toast({
+        title: 'Success',
+        description: 'Your leave request has been submitted successfully.'
       })
-      
-      // Dispatch event for real-time updates
       leaveEvents.requestCreated(newRequest?.id || Date.now(), user.id)
-      
-      // Reset form
       setLeaveType("")
       setStart(undefined)
       setEnd(undefined)
       setReason("")
       setRequestType('full-day')
-      setIsHalfDay(false)
       setHalfDayPeriod('morning')
+      setStartTime("")
+      setEndTime("")
+      setTotalHours(0)
       setEmergencyContact("")
       setEmergencyPhone("")
       setWorkHandover("")
       setAttachment(null)
-      
-      // Refresh shared data (this will update both form and table)
       await refreshAll()
-      
+      if (onSuccess) {
+        onSuccess()
+      }
     } catch (error: any) {
-      toast({ 
-        title: 'Error', 
-        description: error?.response?.data?.message || error?.message || 'Failed to submit leave request', 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: error?.response?.data?.message || error?.message || 'Failed to submit leave request',
+        variant: 'destructive'
       })
-    } finally { 
-      setSaving(false) 
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -365,330 +278,238 @@ export function LeaveRequestForm() {
   const requestedDays = daysBetweenInclusive(start, end)
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
-          Request Leave or Flexible Timing
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs value={requestType} onValueChange={(value: any) => setRequestType(value)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="full-day" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Full Day Leave
-            </TabsTrigger>
-            <TabsTrigger value="half-day" className="flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Half Day Leave
-            </TabsTrigger>
-            <TabsTrigger value="flexible-timing" className="flex items-center gap-2">
-              <Timer className="h-4 w-4" />
-              Flexible Timing
-            </TabsTrigger>
+    <div className="space-y-6">
+      <Tabs value={requestType} onValueChange={(value: any) => setRequestType(value)} className="w-full">
+        {showTabs && (
+          <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsTrigger value="full-day">Full Day</TabsTrigger>
+            <TabsTrigger value="half-day">Half Day</TabsTrigger>
+            <TabsTrigger value="hourly">Hourly</TabsTrigger>
           </TabsList>
-
-          {/* Full Day Leave Tab */}
-          <TabsContent value="full-day" className="space-y-4">
-            {renderLeaveForm()}
-          </TabsContent>
-
-          {/* Half Day Leave Tab */}
-          <TabsContent value="half-day" className="space-y-4">
-            {renderHalfDayForm()}
-          </TabsContent>
-
-
-          {/* Flexible Timing Tab */}
-          <TabsContent value="flexible-timing" className="space-y-4">
-            <FlexibleTimingForm onSuccess={() => refreshAll()} />
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
-  )
-
-  // Render full day leave form
-  function renderLeaveForm() {
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label>Leave Type</Label>
-            <Select value={leaveType} onValueChange={setLeaveType}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Select leave type" />
-              </SelectTrigger>
-              <SelectContent>
-                {types.map(t => (
-                  <SelectItem key={t.value} value={t.value.toString()}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {leaveType && availableBalance !== null && (
-              <div className="flex items-center gap-2 mt-1">
-                <Calendar className="h-3 w-3 text-blue-500" />
-                <span className="text-xs text-blue-600">
-                  Available: {availableBalance} days
-                </span>
-              </div>
-            )}
-          </div>
-          
-          <div className="space-y-1">
-            <Label>Date Range</Label>
-            <DateRangePicker 
-              start={start} 
-              end={end} 
-              onChangeStart={setStart} 
-              onChangeEnd={setEnd}
-              useIST={true}
-            />
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Duration: {requestedDays} day{requestedDays !== 1 ? 's' : ''}
-              </p>
-              {requestedDays > 0 && availableBalance !== null && (
-                <p className="text-xs text-muted-foreground">
-                  Remaining after: {Math.max(0, availableBalance - requestedDays)} days
+        )}
+        <TabsContent value="full-day" className="p-0">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Leave Type *</Label>
+              <Select value={leaveType} onValueChange={setLeaveType}>
+                <SelectTrigger className="w-full h-10">
+                  <SelectValue placeholder="Select leave type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.map(t => (
+                    <SelectItem key={t.value} value={t.value.toString()}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {leaveType && availableBalance !== null && (
+                <p className="text-xs text-blue-600 flex items-center gap-1">
+                  <Calendar className="h-3 w-3" /> Available: {availableBalance} days
                 </p>
               )}
             </div>
-          </div>
-          
-          {/* Validation Message */}
-          {validationMessage && (
-            <div className="sm:col-span-2">
-              <Badge 
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Date Range *</Label>
+              <DateRangePicker
+                start={start}
+                end={end}
+                onChangeStart={setStart}
+                onChangeEnd={setEnd}
+                useIST={true}
+                minDate={new Date()}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Duration: {requestedDays} day{requestedDays !== 1 ? 's' : ''}
+                {requestedDays > 0 && availableBalance !== null && (
+                  <span className="ml-2">• Remaining: {Math.max(0, availableBalance - requestedDays)} days</span>
+                )}
+              </p>
+            </div>
+            {validationMessage && (
+              <Badge
                 variant={validationMessage.type === 'error' ? 'destructive' : 'default'}
-                className="w-full justify-start p-2"
+                className="w-full justify-start p-3 text-sm"
               >
                 {validationMessage.type === 'error' ? (
-                  <AlertTriangle className="h-3 w-3 mr-2" />
+                  <AlertTriangle className="h-4 w-4 mr-2" />
                 ) : (
-                  <Clock className="h-3 w-3 mr-2" />
+                  <Clock className="h-4 w-4 mr-2" />
                 )}
                 {validationMessage.message}
               </Badge>
-            </div>
-          )}
-          
-          <div className="sm:col-span-2 space-y-1">
-            <Label>Reason</Label>
-            <Textarea 
-              value={reason} 
-              onChange={(e) => setReason(e.target.value)} 
-              placeholder="Enter a reason for your leave request" 
-              rows={3}
-            />
-          </div>
-          
-          <div className="sm:col-span-2">
-            <Button 
-              onClick={submit} 
-              disabled={saving || (validationMessage?.type === 'error')}
-              className="w-full"
-            >
-              {saving ? 'Submitting...' : 'Submit Full Day Leave Request'}
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Render half day leave form
-  function renderHalfDayForm() {
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label>Leave Type *</Label>
-            <Select value={leaveType} onValueChange={setLeaveType}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Select leave type to deduct from" />
-              </SelectTrigger>
-              <SelectContent>
-                {types.map(t => (
-                  <SelectItem key={t.value} value={t.value.toString()}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {leaveType && (
-              <div className="flex items-center gap-2 mt-1">
-                <Calendar className="h-3 w-3 text-blue-500" />
-                <span className="text-xs text-blue-600">
-                  Available: {getAvailableBalance()} days
-                </span>
-              </div>
             )}
-            <div className="p-2 bg-blue-50 rounded border border-blue-200">
-              <p className="text-xs text-blue-700">
-                <Clock className="h-3 w-3 inline mr-1" />
-                Half-day leave will deduct 0.5 days from the selected leave type
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Reason *</Label>
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Enter a reason for your leave request"
+                rows={4}
+                className="w-full resize-none"
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button
+                onClick={submit}
+                disabled={saving || (validationMessage?.type === 'error')}
+                className="px-6"
+              >
+                {saving ? 'Submitting...' : 'Submit Request'}
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+        <TabsContent value="half-day" className="p-0">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Leave Type *</Label>
+              <Select value={leaveType} onValueChange={setLeaveType}>
+                <SelectTrigger className="w-full h-10">
+                  <SelectValue placeholder="Select leave type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.map(t => (
+                    <SelectItem key={t.value} value={t.value.toString()}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {leaveType && (
+                <p className="text-xs text-blue-600 flex items-center gap-1">
+                  <Calendar className="h-3 w-3" /> Available: {getAvailableBalance()} days
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Date *</Label>
+              <DatePicker
+                value={start}
+                onChange={(date) => { setStart(date); setEnd(date); }}
+                placeholder="Select date (DD/MM/YYYY)"
+                displayFormat="DD/MM/YYYY"
+                useIST={true}
+                minDate={new Date()}
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Half Day Period *</Label>
+              <Select value={halfDayPeriod} onValueChange={setHalfDayPeriod as (value: string) => void}>
+                <SelectTrigger className="w-full h-10">
+                  <SelectValue placeholder="Select period" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="morning">Morning (First Half)</SelectItem>
+                  <SelectItem value="afternoon">Afternoon (Second Half)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {halfDayPeriod === 'morning' ? 'Absent in morning, work in afternoon' : 'Work in morning, absent in afternoon'}
               </p>
             </div>
           </div>
-          
-          <div className="space-y-1">
-            <Label>Date</Label>
-            <DateRangePicker 
-              start={start} 
-              end={start} // Same date for half day
-              onChangeStart={(date) => {
-                setStart(date)
-                setEnd(date) // Set same date for half day
-              }} 
-              onChangeEnd={(date) => {
-                setStart(date)
-                setEnd(date)
-              }}
-              useIST={true}
+          <div className="space-y-2 mt-4">
+            <Label className="text-sm font-medium">Reason *</Label>
+            <Textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Enter a reason for your half-day leave request"
+              rows={4}
+              className="w-full resize-none"
             />
           </div>
-
-          <div className="space-y-1">
-            <Label>Half Day Period</Label>
-            <Select value={halfDayPeriod} onValueChange={(value: 'morning' | 'afternoon') => setHalfDayPeriod(value)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="morning">Morning (First Half)</SelectItem>
-                <SelectItem value="afternoon">Afternoon (Second Half)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {halfDayPeriod === 'morning' 
-                ? 'You will be absent in the morning and work in the afternoon'
-                : 'You will work in the morning and be absent in the afternoon'
-              }
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <Label>Duration</Label>
-            <Badge variant="secondary" className="w-full justify-center p-2">
-              <Clock className="h-3 w-3 mr-2" />
-              0.5 days (Half Day)
-            </Badge>
-          </div>
-          
-          <div className="sm:col-span-2 space-y-1">
-            <Label>Reason</Label>
-            <Textarea 
-              value={reason} 
-              onChange={(e) => setReason(e.target.value)} 
-              placeholder="Enter a reason for your half-day leave request" 
-              rows={3}
-            />
-          </div>
-          
-          <div className="sm:col-span-2">
-            <Button 
-              onClick={submit} 
+          <div className="flex justify-end mt-4">
+            <Button
+              onClick={submit}
               disabled={saving || !start || !leaveType}
-              className="w-full"
+              className="px-6"
             >
-              {saving ? 'Submitting...' : 'Submit Half Day Leave Request'}
+              {saving ? 'Submitting...' : 'Submit Request'}
             </Button>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Render hourly leave form
-  function renderHourlyForm() {
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label>Leave Type</Label>
-            <Select value={leaveType} onValueChange={setLeaveType}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Select leave type" />
-              </SelectTrigger>
-              <SelectContent>
-                {types.map(t => (
-                  <SelectItem key={t.value} value={t.value.toString()}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-1">
-            <Label>Date</Label>
-            <DateRangePicker 
-              start={start} 
-              end={start} // Same date for hourly
-              onChangeStart={(date) => {
-                setStart(date)
-                setEnd(date)
-              }} 
-              onChangeEnd={(date) => {
-                setStart(date)
-                setEnd(date)
-              }}
-              useIST={true}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label>Start Time</Label>
-            <Input
-              type="time"
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <Label>End Time</Label>
-            <Input
-              type="time"
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-            />
-          </div>
-
-          {totalHours > 0 && (
-            <div className="sm:col-span-2">
-              <Badge variant="secondary" className="w-full justify-center p-2">
-                <Timer className="h-3 w-3 mr-2" />
-                {totalHours.toFixed(1)} hours ({(totalHours / 8).toFixed(2)} days)
-              </Badge>
+        </TabsContent>
+        <TabsContent value="hourly" className="p-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Leave Type *</Label>
+              <Select value={leaveType} onValueChange={setLeaveType}>
+                <SelectTrigger className="w-full h-10">
+                  <SelectValue placeholder="Select leave type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.map(t => (
+                    <SelectItem key={t.value} value={t.value.toString()}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          )}
-          
-          <div className="sm:col-span-2 space-y-1">
-            <Label>Reason</Label>
-            <Textarea 
-              value={reason} 
-              onChange={(e) => setReason(e.target.value)} 
-              placeholder="Enter a reason for your hourly leave request" 
-              rows={3}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Date *</Label>
+              <DateRangePicker
+                start={start}
+                end={start}
+                onChangeStart={(date) => { setStart(date); setEnd(date); }}
+                onChangeEnd={(date) => { setStart(date); setEnd(date); }}
+                useIST={true}
+                minDate={new Date()}
+                className="w-full"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Start Time *</Label>
+              <Input
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="w-full h-10"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">End Time *</Label>
+              <Input
+                type="time"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="w-full h-10"
+              />
+            </div>
+            {totalHours > 0 && (
+              <div className="sm:col-span-2 space-y-2">
+                <Label className="text-sm font-medium">Duration</Label>
+                <div className="h-10 flex items-center justify-center bg-secondary rounded-md px-3">
+                  <Badge variant="secondary" className="border-0">
+                    <Timer className="h-3 w-3 mr-2" />
+                    {totalHours.toFixed(1)} hours ({(totalHours / 8).toFixed(2)} days)
+                  </Badge>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="space-y-2 mt-4">
+            <Label className="text-sm font-medium">Reason *</Label>
+            <Textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Enter a reason for your hourly leave request"
+              rows={4}
+              className="w-full resize-none"
             />
           </div>
-          
-          <div className="sm:col-span-2">
-            <Button 
-              onClick={submit} 
-              disabled={saving || !start || !leaveType || !startTime || !endTime || totalHours <= 0}
-              className="w-full"
-            >
-              {saving ? 'Submitting...' : 'Submit Hourly Leave Request'}
-            </Button>
-          </div>
-        </div>
-      </div>
-    )
-  }
+          <Button
+            onClick={submit}
+            disabled={saving || !start || !leaveType || !startTime || !endTime || totalHours <= 0}
+            className="w-full h-11 mt-4"
+            size="lg"
+          >
+            {saving ? 'Submitting...' : 'Submit Hourly Leave Request'}
+          </Button>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
 }

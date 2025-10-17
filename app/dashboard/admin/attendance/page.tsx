@@ -226,8 +226,8 @@ export default function AdminAttendancePage() {
             )}
             tableColumns={[
               { key: 'sr', header: 'Sr No.', className: 'w-16', cell: (_r, i) => <span className="font-medium">{i + 1}</span> },
-              { key: 'user_name', header: 'Employee', sortable: true, sortAccessor: (r) => userOptions.find(u => Number(u.value)===Number((r as any).user))?.label || (r as any).user, cell: (r) => {
-                const userName = userOptions.find(u => Number(u.value)===Number(r.user))?.label || `User ${r.user}`
+              { key: 'user_name', header: 'Employee', sortable: true, sortAccessor: (r) => (r as any).user_name || `User ${r.user}`, cell: (r) => {
+                const userName = (r as any).user_name || `User ${r.user}`
                 return (
                   <button 
                     className="text-left text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer transition-colors"

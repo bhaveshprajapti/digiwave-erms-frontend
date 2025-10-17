@@ -28,14 +28,14 @@ export function DateRangePicker({
   minDate
 }: DateRangePickerProps) {
   return (
-    <div id="date-range-picker" className={cn("flex items-center", className)}>
-      <div className="relative">
+    <div id="date-range-picker" className={cn("flex items-center flex-wrap gap-2", className)}>
+      <div className="relative flex-1 min-w-[160px]">
         <DatePicker
           value={start}
           onChange={onChangeStart}
-          placeholder="Start Date (DD/MM/YYYY)"
-          inputClassName="h-9 ps-10"
-          className="min-w-[180px]"
+          placeholder="Start (DD/MM/YYYY)"
+          inputClassName="h-10 ps-10"
+          className="w-full"
           displayFormat="DD/MM/YYYY"
           useIST={useIST}
           disabled={disabled}
@@ -43,14 +43,14 @@ export function DateRangePicker({
           minDate={minDate}
         />
       </div>
-      <span className="mx-2 text-gray-500">to</span>
-      <div className="relative">
+      <span className="text-gray-500 text-sm">to</span>
+      <div className="relative flex-1 min-w-[160px]">
         <DatePicker
           value={end}
           onChange={onChangeEnd}
-          placeholder="End Date (DD/MM/YYYY)"
-          inputClassName="h-9 ps-10"
-          className="min-w-[180px]"
+          placeholder="End (DD/MM/YYYY)"
+          inputClassName="h-10 ps-10"
+          className="w-full"
           displayFormat="DD/MM/YYYY"
           useIST={useIST}
           disabled={disabled}

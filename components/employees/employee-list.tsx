@@ -298,20 +298,6 @@ export function EmployeeList() {
                     onEdit={() => handleEditEmployee(employee)}
                     onDelete={currentUser?.id !== employee.id && !employee.is_superuser ? () => handleDeleteEmployee(employee) : undefined}
                     extras={[
-                      { 
-                        title: 'View Attendance', 
-                        onClick: () => {
-                          const employeeName = `${employee.first_name} ${employee.last_name}`
-                          setAttendanceModal({ 
-                            isOpen: true, 
-                            employeeId: parseInt(employee.id), 
-                            employeeName, 
-                            selectedDate: new Date().toISOString().split('T')[0] 
-                          })
-                        }, 
-                        className: 'hover:bg-blue-100', 
-                        icon: <Clock className="h-4 w-4 text-blue-600" /> 
-                      },
                       ...(getEmployeeTypeName(employee.employee_type).toLowerCase() === 'fixed'
                         ? [{ title: 'Add Fixed Details', onClick: () => {}, className: 'hover:bg-green-100', icon: <DollarSign className="h-4 w-4 text-green-600" /> }] as any
                         : []),

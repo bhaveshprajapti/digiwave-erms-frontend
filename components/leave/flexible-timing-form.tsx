@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Calendar, Clock, AlertTriangle, CheckCircle } from "lucide-react"
 import { 
   getFlexibleTimingTypes, 
@@ -218,20 +218,14 @@ export function FlexibleTimingForm({ onSuccess }: FlexibleTimingFormProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5" />
-          Request Flexible Timing
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-5">
           {/* Timing Type Selection */}
           <div className="space-y-2">
-            <Label htmlFor="timing-type">Timing Type *</Label>
+            <Label htmlFor="timing-type" className="text-sm font-medium">Timing Type *</Label>
             <Select value={timingType} onValueChange={setTimingType}>
-              <SelectTrigger>
+              <SelectTrigger className="h-10 w-full">
                 <SelectValue placeholder="Select timing type" />
               </SelectTrigger>
               <SelectContent>
@@ -248,119 +242,120 @@ export function FlexibleTimingForm({ onSuccess }: FlexibleTimingFormProps) {
               </SelectContent>
             </Select>
             {selectedType && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {selectedType.description}
               </p>
             )}
           </div>
 
-          {/* Balance Information */}
-          {balance && (
-            <div className="p-3 bg-muted rounded-lg">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Monthly Usage</span>
-                <div className="flex items-center gap-2">
-                  <Badge variant={balance.can_request_more ? "default" : "destructive"}>
-                    {balance.used_count + balance.pending_count} / {balance.total_allowed}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {balance.remaining_count} remaining
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-
           {/* Date */}
           <div className="space-y-2">
-            <Label htmlFor="requested-date">Requested Date *</Label>
-            <DateRangePicker 
-              start={requestedDate} 
-              end={requestedDate} // Same date for flexible timing
-              onChangeStart={(date) => setRequestedDate(date)} 
-              onChangeEnd={(date) => setRequestedDate(date)} 
+            <Label htmlFor="requested-date" className="text-sm font-medium">Requested Date *</Label>
+            <DatePicker
+              value={requestedDate}
+              onChange={(date) => setRequestedDate(date)}
+              placeholder="Select date (DD/MM/YYYY)"
+              displayFormat="DD/MM/YYYY"
+              minDate={new Date()}
+              useIST={true}
+              className="w-full"
             />
           </div>
 
           {/* Duration */}
           <div className="space-y-2">
-            <Label htmlFor="duration">Duration (minutes) *</Label>
-            <Input
-              id="duration"
-              type="number"
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(e.target.value)}
-              placeholder="e.g., 60"
-              min="1"
-              max={selectedType?.max_duration_minutes || 480}
-            />
-            {selectedType && (
-              <p className="text-sm text-muted-foreground">
-                Maximum: {selectedType.max_duration_minutes} minutes
-              </p>
-            )}
-          </div>
-
-
-          {/* Reason */}
-          <div className="space-y-2">
-            <Label htmlFor="reason">Reason *</Label>
-            <Textarea
-              id="reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Please provide a reason for this flexible timing request..."
-              rows={3}
-            />
-          </div>
-
-          {/* Emergency Checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="emergency"
-              checked={isEmergency}
-              onCheckedChange={(checked) => setIsEmergency(checked as boolean)}
-            />
-            <Label htmlFor="emergency" className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-              This is an emergency request
-            </Label>
-          </div>
-          {isEmergency && (
-            <p className="text-sm text-orange-600 bg-orange-50 p-2 rounded">
-              Emergency requests may bypass advance notice requirements but still require approval.
+            <Label htmlFor="duration" className="text-sm font-medium">Duration (minutes) *</Label>
+            <Select value={durationMinutes} onValueChange={setDurationMinutes}>
+              <SelectTrigger className="h-10 w-full">
+                <SelectValue placeholder="Select duration" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">15 minutes</SelectItem>
+                <SelectItem value="30">30 minutes</SelectItem>
+                <SelectItem value="60">60 minutes (1 hour)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Only 15, 30, or 60 minute durations are allowed
             </p>
-          )}
+          </div>
 
-          {/* Validation Message */}
-          {(timingType && requestedDate && durationMinutes) && (
-            <div className={`p-3 rounded-lg ${
-              validationMessage.type === 'success' 
-                ? 'bg-green-50 text-green-700 border border-green-200' 
-                : 'bg-red-50 text-red-700 border border-red-200'
-            }`}>
-              <div className="flex items-center gap-2">
-                {validationMessage.type === 'success' ? (
-                  <CheckCircle className="h-4 w-4" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4" />
-                )}
-                <span className="text-sm font-medium">{validationMessage.message}</span>
+          {/* Balance Information */}
+          {balance && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Monthly Usage</Label>
+              <div className="h-10 flex items-center justify-between bg-muted rounded-md px-3">
+                <Badge variant={balance.can_request_more ? "default" : "destructive"}>
+                  {balance.used_count + balance.pending_count} / {balance.total_allowed}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {balance.remaining_count} remaining
+                </span>
               </div>
             </div>
           )}
+        </div>
 
-          {/* Submit Button */}
+        {/* Reason */}
+        <div className="space-y-2">
+          <Label htmlFor="reason" className="text-sm font-medium">Reason *</Label>
+          <Textarea
+            id="reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Please provide a reason for this flexible timing request..."
+            rows={4}
+            className="w-full resize-none"
+          />
+        </div>
+
+        {/* Emergency Checkbox */}
+        <div className="flex items-center space-x-2 p-3 bg-muted rounded-md">
+          <Checkbox
+            id="emergency"
+            checked={isEmergency}
+            onCheckedChange={(checked) => setIsEmergency(checked as boolean)}
+          />
+          <Label htmlFor="emergency" className="flex items-center gap-2 cursor-pointer">
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            This is an emergency request
+          </Label>
+        </div>
+        {isEmergency && (
+          <p className="text-sm text-orange-600 bg-orange-50 p-3 rounded-md border border-orange-200">
+            Emergency requests may bypass advance notice requirements but still require approval.
+          </p>
+        )}
+
+        {/* Validation Message */}
+        {(timingType && requestedDate && durationMinutes) && (
+          <div className={`p-3 rounded-md ${
+            validationMessage.type === 'success' 
+              ? 'bg-green-50 text-green-700 border border-green-200' 
+              : 'bg-red-50 text-red-700 border border-red-200'
+          }`}>
+            <div className="flex items-center gap-2">
+              {validationMessage.type === 'success' ? (
+                <CheckCircle className="h-4 w-4" />
+              ) : (
+                <AlertTriangle className="h-4 w-4" />
+              )}
+              <span className="text-sm font-medium">{validationMessage.message}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <div className="flex justify-end">
           <Button 
             type="submit" 
             disabled={saving || !validateForm().valid}
-            className="w-full"
+            className="px-6"
           >
             {saving ? 'Submitting...' : 'Submit Request'}
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </form>
+    </div>
   )
 }
