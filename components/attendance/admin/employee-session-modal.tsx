@@ -16,6 +16,7 @@ import { Clock, Coffee, Play, User, Calendar, RefreshCw, LogIn, LogOut, Timer, C
 import { useToast } from "@/hooks/use-toast"
 import { adminResetDay, listAttendances, AttendanceDTO } from "@/lib/api/attendances"
 import { attendanceEvents } from "@/hooks/use-attendance-updates"
+import { formatUTCtoISTTime, formatUTCtoISTDate, getISTDateString } from "@/lib/timezone"
 
 interface Session {
   check_in: string
@@ -129,13 +130,9 @@ export function EmployeeSessionModal({
     }
   }, [isOpen, employeeId, selectedDate])
 
-  const formatTime = (timeString: string) => {
+  const formatTime = (utcTimeString: string) => {
     if (!isMounted) return "--:--:--"
-    return new Date(timeString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
+    return formatUTCtoISTTime(utcTimeString, false, true) // 24-hour format with seconds
   }
 
   const formatDuration = (checkIn: string, checkOut?: string) => {
@@ -154,13 +151,7 @@ export function EmployeeSessionModal({
 
   const formatDate = (dateStr: string) => {
     if (!isMounted) return dateStr
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
+    return formatUTCtoISTDate(dateStr + 'T00:00:00Z', 'DD/MM/YYYY')
   }
 
   const handleDateChange = (date: Date | undefined) => {
@@ -235,6 +226,9 @@ export function EmployeeSessionModal({
                     value={new Date(selectedDate)}
                     onChange={handleDateChange}
                     className="w-40"
+                    placeholder="DD/MM/YYYY"
+                    useIST={true}
+                    maxDate={new Date()}
                   />
                 </div>
               </div>

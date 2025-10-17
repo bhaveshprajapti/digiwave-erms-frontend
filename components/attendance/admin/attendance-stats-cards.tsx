@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Users, Clock, CheckCircle, XCircle, Calendar, TrendingUp } from "lucide-react"
 import { listAttendances } from "@/lib/api/attendances"
 import { useEmployees } from "@/hooks/use-employees"
+import { getISTDateString } from "@/lib/timezone"
 
 interface AttendanceStats {
   totalEmployees: number
@@ -31,7 +32,7 @@ export function AttendanceStatsCards() {
   const loadStats = async () => {
     try {
       setLoading(true)
-      const today = new Date().toISOString().slice(0, 10)
+      const today = getISTDateString()
       
       // Get today's attendance
       const todayAttendance = await listAttendances({

@@ -9,6 +9,12 @@ import { listAttendances } from "@/lib/api/attendances"
 import { authService } from "@/lib/auth"
 import { calculateAttendanceStatus, clearAttendanceStatusCache } from "@/lib/utils/attendance-status"
 import { useAttendanceUpdates } from "@/hooks/use-attendance-updates"
+import { 
+  getISTDateString, 
+  getCurrentIST, 
+  formatUTCtoISTDate,
+  getUTCRangeForISTDate 
+} from "@/lib/timezone"
 
 export function AttendanceCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -44,10 +50,11 @@ export function AttendanceCalendar() {
 
     setLoading(true)
     try {
+      // Use IST dates for calendar display
       const year = currentDate.getFullYear()
       const month = currentDate.getMonth()
-      const startDate = new Date(year, month, 1).toISOString().slice(0, 10)
-      const endDate = new Date(year, month + 1, 0).toISOString().slice(0, 10)
+      const startDate = getISTDateString(new Date(year, month, 1))
+      const endDate = getISTDateString(new Date(year, month + 1, 0))
 
       const data = await listAttendances({
         user: userId,
@@ -152,7 +159,11 @@ export function AttendanceCalendar() {
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <span className="text-sm font-medium min-w-[140px] text-center">
-                {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                {currentDate.toLocaleDateString("en-IN", { 
+                  month: "long", 
+                  year: "numeric",
+                  timeZone: "Asia/Kolkata"
+                })}
               </span>
               <Button variant="outline" size="icon" onClick={nextMonth} disabled={loading}>
                 <ChevronRight className="h-4 w-4" />
@@ -179,7 +190,7 @@ export function AttendanceCalendar() {
                 const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
                 const attendanceInfo = attendanceData[dateStr]
                 const hasData = !!attendanceInfo
-                const today = new Date().toISOString().slice(0, 10) === dateStr
+                const today = getISTDateString() === dateStr
 
                 return (
                   <div

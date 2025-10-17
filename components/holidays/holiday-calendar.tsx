@@ -157,7 +157,14 @@ const renderModal = () => (
           <div className="grid grid-cols-4 items-start gap-4">
             <Label className="text-right pt-2">Date</Label>
             <div className="col-span-3">
-<DatePicker value={form.date} onChange={(d)=>setForm(f=>({ ...f, date: d }))} disabled={viewOnly} displayFormat="DD/MM/YYYY" />
+<DatePicker 
+              value={form.date} 
+              onChange={(d)=>setForm(f=>({ ...f, date: d }))} 
+              disabled={viewOnly} 
+              displayFormat="DD/MM/YYYY"
+              useIST={true}
+              placeholder="DD/MM/YYYY"
+            />
             </div>
           </div>
           <div className="grid grid-cols-4 items-start gap-4">

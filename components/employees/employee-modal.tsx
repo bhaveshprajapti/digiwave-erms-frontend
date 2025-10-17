@@ -676,6 +676,10 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                           onChange={(date: Date | undefined) => {
                             handleChange("birth_date", date?.toISOString().split('T')[0] || "")
                           }}
+                          placeholder="DD/MM/YYYY"
+                          useIST={true}
+                          disableFuture={true}
+                          minDate={new Date(1950, 0, 1)}
                         />
                       </td>
                     </tr>
@@ -876,6 +880,10 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                             setJoiningDate(date)
                             handleChange("joining_date", date?.toISOString().split('T')[0] || "")
                           }}
+                          placeholder="DD/MM/YYYY"
+                          useIST={true}
+                          maxDate={new Date()}
+                          minDate={new Date(2000, 0, 1)}
                         />
                       </td>
                     </tr>
@@ -1061,6 +1069,9 @@ export function EmployeeModal({ isOpen, onClose, employee, mode, onSuccess }: Em
                           }}
                           disabled={!formData.is_on_notice_period}
                           inputClassName="h-9"
+                          placeholder="DD/MM/YYYY"
+                          useIST={true}
+                          minDate={new Date()}
                         />
                       </td>
                     </tr>

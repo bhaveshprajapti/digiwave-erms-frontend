@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Clock, LogIn, LogOut, Timer, Users, Coffee, CheckCircle } from "lucide-react"
+import { formatUTCtoISTTime, formatUTCtoISTDate } from "@/lib/timezone"
 
 interface SessionDetailsModalProps {
   open: boolean
@@ -48,13 +49,9 @@ export function SessionDetailsModal({ open, onOpenChange, attendance }: SessionD
     
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   }
-  const formatTime = (timeString: string) => {
+  const formatTime = (utcTimeString: string) => {
     if (!isMounted) return "--:--:--"
-    return new Date(timeString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    })
+    return formatUTCtoISTTime(utcTimeString, false, true) // 24-hour format with seconds
   }
 
   const formatDuration = (checkIn: string, checkOut?: string) => {
@@ -77,12 +74,7 @@ export function SessionDetailsModal({ open, onOpenChange, attendance }: SessionD
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Attendance Details - {isMounted ? new Date(attendance.date).toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            }) : attendance.date}
+            Attendance Details - {isMounted ? formatUTCtoISTDate(attendance.date + 'T00:00:00Z', 'DD/MM/YYYY') : attendance.date}
           </DialogTitle>
         </DialogHeader>
         

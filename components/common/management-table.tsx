@@ -359,8 +359,9 @@ export function ManagementTable<T extends { id: number; is_active?: boolean }>({
           <DatePicker
             value={toDateObj(value as string)}
             onChange={(d) => onChange(toYMD(d))}
-            placeholder="YYYY-MM-DD"
+            placeholder="DD/MM/YYYY"
             className="!h-10 !w-full"
+            useIST={true}
           />
         )
       default:

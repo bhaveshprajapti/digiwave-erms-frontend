@@ -9,6 +9,13 @@ import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { DataTable } from "@/components/common/data-table"
 import { SessionDetailsModal } from "./session-details-modal"
 import { useAttendanceUpdates } from "@/hooks/use-attendance-updates"
+import { 
+  formatUTCtoISTDate, 
+  formatUTCtoIST, 
+  getISTDateString,
+  parseISTDateForAPI,
+  formatDuration 
+} from "@/lib/timezone"
 import { RefreshCw } from "lucide-react"
 
 
@@ -35,8 +42,8 @@ export function AttendanceHistory() {
     setLoading(true)
     try {
       const params: any = { user: userId, page, page_size: pageSize }
-      if (start) params.start_date = start.toISOString().slice(0, 10)
-      if (end) params.end_date = end.toISOString().slice(0, 10)
+      if (start) params.start_date = getISTDateString(start)
+      if (end) params.end_date = getISTDateString(end)
       const data = await listAttendances(params)
       setItems(data.results)
       setCount(data.count)
@@ -85,7 +92,13 @@ export function AttendanceHistory() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <DateRangePicker start={start} end={end} onChangeStart={setStart} onChangeEnd={setEnd} />
+          <DateRangePicker 
+            start={start} 
+            end={end} 
+            onChangeStart={setStart} 
+            onChangeEnd={setEnd}
+            useIST={true}
+          />
         </div>
       </CardHeader>
       <CardContent>
@@ -106,12 +119,7 @@ export function AttendanceHistory() {
               sortable: true,
               cell: (r: any) => (
                 <div className="font-medium cursor-pointer text-blue-600 hover:text-blue-800 hover:underline transition-colors" onClick={() => handleViewDetails(r)}>
-                  {isMounted ? new Date(r.date).toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                  }) : r.date}
+                  {isMounted ? formatUTCtoISTDate(r.date + 'T00:00:00Z', 'DD/MM/YYYY') : r.date}
                 </div>
               )
             },
@@ -155,7 +163,7 @@ export function AttendanceHistory() {
               cell: (r: any) => {
                 const sessions = r.sessions || []
                 const hasActive = sessions.some((s: any) => !s.check_out)
-                const today = new Date().toISOString().split('T')[0]
+                const today = getISTDateString()
                 const recordDate = r.date
                 const isToday = recordDate === today
 

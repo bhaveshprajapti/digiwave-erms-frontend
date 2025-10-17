@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertTriangle, Calendar, Clock, Timer } from "lucide-react"
 import { useLeaveRequestsContext } from "@/contexts/leave-requests-context"
 import { FlexibleTimingForm } from "./flexible-timing-form"
+import { formatUTCtoISTDate, getISTDateString } from "@/lib/timezone"
 
 // Helper function to calculate duration (EXACTLY like backend Django model)
 function calculateDuration(startDate: string, endDate: string): number {
@@ -201,8 +202,8 @@ export function LeaveRequestForm() {
     
     if (hasDateConflict()) {
       const conflictingRequest = getConflictingRequest()
-      const conflictStart = conflictingRequest ? new Date(conflictingRequest.start_date).toLocaleDateString() : ''
-      const conflictEnd = conflictingRequest ? new Date(conflictingRequest.end_date).toLocaleDateString() : ''
+      const conflictStart = conflictingRequest ? formatUTCtoISTDate(conflictingRequest.start_date + 'T00:00:00Z') : ''
+      const conflictEnd = conflictingRequest ? formatUTCtoISTDate(conflictingRequest.end_date + 'T00:00:00Z') : ''
       
       // Get status name
       const getStatusName = (status: any) => {
@@ -440,7 +441,8 @@ export function LeaveRequestForm() {
               start={start} 
               end={end} 
               onChangeStart={setStart} 
-              onChangeEnd={setEnd} 
+              onChangeEnd={setEnd}
+              useIST={true}
             />
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
@@ -542,7 +544,8 @@ export function LeaveRequestForm() {
               onChangeEnd={(date) => {
                 setStart(date)
                 setEnd(date)
-              }} 
+              }}
+              useIST={true}
             />
           </div>
 
@@ -630,7 +633,8 @@ export function LeaveRequestForm() {
               onChangeEnd={(date) => {
                 setStart(date)
                 setEnd(date)
-              }} 
+              }}
+              useIST={true}
             />
           </div>
 

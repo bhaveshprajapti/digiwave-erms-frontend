@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DatePicker } from '@/components/ui/date-picker'
 import { useToast } from '@/hooks/use-toast'
 import { quotationService, clientService } from '@/services/api'
 
@@ -325,11 +326,12 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
 
             <div className="space-y-2">
               <Label htmlFor="issue_date">Issue Date *</Label>
-              <Input
+              <DatePicker
                 id="issue_date"
-                type="date"
-                value={formData.issue_date || ''}
-                onChange={(e) => handleInputChange('issue_date', e.target.value)}
+                value={formData.issue_date ? new Date(formData.issue_date) : undefined}
+                onChange={(date) => handleInputChange('issue_date', date?.toISOString().split('T')[0] || '')}
+                placeholder="DD/MM/YYYY"
+                useIST={true}
                 className={errors.issue_date ? 'border-red-500' : ''}
               />
               {errors.issue_date && (
@@ -339,11 +341,13 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
 
             <div className="space-y-2">
               <Label htmlFor="expiry_date">Expiry Date</Label>
-              <Input
+              <DatePicker
                 id="expiry_date"
-                type="date"
-                value={formData.expiry_date || ''}
-                onChange={(e) => handleInputChange('expiry_date', e.target.value)}
+                value={formData.expiry_date ? new Date(formData.expiry_date) : undefined}
+                onChange={(date) => handleInputChange('expiry_date', date?.toISOString().split('T')[0] || '')}
+                placeholder="DD/MM/YYYY"
+                useIST={true}
+                minDate={new Date()}
               />
             </div>
           </div>

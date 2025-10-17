@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
 import { CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react"
+import { formatUTCtoISTDate, getISTDateString } from "@/lib/timezone"
 import { useLeaveRequestsContext } from "@/contexts/leave-requests-context"
 
 // Duration calculation function (EXACTLY like backend Django model)
@@ -29,13 +30,9 @@ function calculateDuration(startDate: string, endDate: string): number {
   return diffDays + 1
 }
 
-// Format date function (DD/MM/YYYY)
+// Format date function using IST utilities (DD/MM/YYYY)
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  const dd = String(date.getDate()).padStart(2, '0')
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const yyyy = date.getFullYear()
-  return `${dd}/${mm}/${yyyy}`
+  return formatUTCtoISTDate(dateStr + 'T00:00:00Z')
 }
 
 // Status badge component with consistent styling
@@ -144,10 +141,10 @@ export function LeaveRequestList() {
       // Filter by user (leave requests) or current user (flexible timing)
       if (r.request_type !== 'flexible-timing' && r.user !== userId) return false
       
-      // Filter by date range
-      const d = new Date(r.start_date)
-      if (start && d < new Date(start.getFullYear(), start.getMonth(), start.getDate())) return false
-      if (end && d > new Date(end.getFullYear(), end.getMonth(), end.getDate())) return false
+      // Filter by date range using IST dates
+      const requestDate = r.start_date
+      if (start && requestDate < getISTDateString(start)) return false
+      if (end && requestDate > getISTDateString(end)) return false
       return true
     })
   }, [allRequests, userId, start, end])
@@ -199,7 +196,13 @@ export function LeaveRequestList() {
         <CardHeader className="flex items-start justify-between gap-3">
           <CardTitle>My Leave Requests & Flexible Timing</CardTitle>
           <div className="flex items-center gap-2">
-            <DateRangePicker start={start} end={end} onChangeStart={setStart} onChangeEnd={setEnd} />
+            <DateRangePicker 
+              start={start} 
+              end={end} 
+              onChangeStart={setStart} 
+              onChangeEnd={setEnd}
+              useIST={true}
+            />
           </div>
         </CardHeader>
         <CardContent>
@@ -253,8 +256,8 @@ export function LeaveRequestList() {
               },
               { key: 'actions', header: <span className="block text-center">Actions</span>, cell: (r) => {
                 const request = r as any
-                const today = new Date()
-                const startDate = new Date(request.start_date)
+                const today = getISTDateString()
+                const startDate = request.start_date
                 
                 // User can delete if it's pending and before start date
                 const canUserDelete = (request.status === 'pending' || !request.status) && startDate > today

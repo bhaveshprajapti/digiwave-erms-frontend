@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { Switch } from "@/components/ui/switch"
+import { DatePicker } from "@/components/ui/date-picker"
 import { 
   User, 
   Mail, 
@@ -374,11 +375,14 @@ export function EmployeeProfile() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="birth_date">Birth Date</Label>
-                  <Input
+                  <DatePicker
                     id="birth_date"
-                    type="date"
-                    value={formData.birth_date}
-                    onChange={(e) => handleInputChange("birth_date", e.target.value)}
+                    value={formData.birth_date ? new Date(formData.birth_date) : undefined}
+                    onChange={(date) => handleInputChange("birth_date", date?.toISOString().split('T')[0] || '')}
+                    placeholder="DD/MM/YYYY"
+                    useIST={true}
+                    disableFuture={true}
+                    minDate={new Date(1950, 0, 1)}
                     disabled={!editMode}
                     className={editMode ? "" : "bg-gray-50"}
                   />

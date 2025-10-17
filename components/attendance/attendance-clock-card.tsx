@@ -11,6 +11,15 @@ import { getMyLeaveApplications } from "@/lib/api/leave-requests"
 import authService from "@/lib/auth"
 import api from "@/lib/api"
 import { attendanceEvents, useAttendanceUpdates } from "@/hooks/use-attendance-updates"
+import { 
+  getCurrentIST, 
+  convertUTCtoIST, 
+  formatUTCtoISTTime, 
+  formatUTCtoISTDate,
+  getISTDateString,
+  formatDuration,
+  isToday 
+} from "@/lib/timezone"
 import Swal from 'sweetalert2'
 
 // Helper functions for secure user-specific localStorage
@@ -86,15 +95,8 @@ export function AttendanceClockCard() {
     return `${hours}:${minutes}:${seconds}`
   }
 
-  // Helper function to get current time in IST
-  const getCurrentIST = () => {
-    const now = new Date()
-    // Convert to IST (UTC+5:30)
-    const istOffset = 5.5 * 60 * 60 * 1000 // 5.5 hours in milliseconds
-    const utc = now.getTime() + (now.getTimezoneOffset() * 60 * 1000)
-    const ist = new Date(utc + istOffset)
-    return ist
-  }
+  // Use timezone utility for IST time
+  // getCurrentIST is now imported from @/lib/timezone
 
   // Helper function to get IST time in minutes from midnight
   const getISTTimeInMinutes = () => {
@@ -262,7 +264,7 @@ export function AttendanceClockCard() {
   // Validate if user has approved leave for current date
   const validateLeaveStatus = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
+      const today = getISTDateString() // IST date in YYYY-MM-DD format
 
       // Get all leave applications and filter for approved ones
       const allLeaveApplications = await getMyLeaveApplications()
@@ -471,7 +473,7 @@ export function AttendanceClockCard() {
   // Timer effect for live updates
   useEffect(() => {
     const timer = setInterval(() => {
-      const now = getCurrentIST() // Use IST instead of local time
+      const now = getCurrentIST() // Use IST timezone utility
       setCurrentTime(now)
 
       // Calculate live working time if checked in and working (original working logic)
@@ -854,11 +856,11 @@ export function AttendanceClockCard() {
     }
   }
 
-  // Helper function to format time
-  const formatTime = (timeString?: string) => {
-    if (!timeString) return "--:--:--"
+  // Helper function to format UTC time to IST display
+  const formatTime = (utcTimeString?: string) => {
+    if (!utcTimeString) return "--:--:--"
     if (!isMounted) return "--:--:--"
-    return new Date(timeString).toLocaleTimeString()
+    return formatUTCtoISTTime(utcTimeString, false, true) // 24-hour format with seconds
   }
 
   // Get dynamic border color based on status (constant, no blinking)
@@ -1107,14 +1109,18 @@ export function AttendanceClockCard() {
               </div>
               <div className="text-sm">
                 <p className="font-medium text-foreground">
-                  {isMounted && currentTime ? currentTime.toLocaleDateString('en-US', {
+                  {isMounted && currentTime ? currentTime.toLocaleDateString('en-IN', {
                     weekday: 'long',
                     month: 'long',
-                    day: 'numeric'
+                    day: 'numeric',
+                    timeZone: 'Asia/Kolkata'
                   }) : "Loading..."}
                 </p>
                 <p className="text-muted-foreground">
-                  {isMounted && currentTime ? currentTime.toLocaleTimeString() : "--:--:--"}
+                  {isMounted && currentTime ? currentTime.toLocaleTimeString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    hour12: false
+                  }) : "--:--:--"}
                 </p>
                 {dayEnded ? (
                   <p className="text-xs text-gray-600 mt-1 font-medium">

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Upload } from "lucide-react"
 
 export function ExpenseForm() {
@@ -64,7 +65,12 @@ export function ExpenseForm() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="date">Date</Label>
-                <Input id="date" type="date" required />
+                <DatePicker
+                  id="date"
+                  placeholder="DD/MM/YYYY"
+                  useIST={true}
+                  maxDate={new Date()}
+                />
               </div>
             </div>
 

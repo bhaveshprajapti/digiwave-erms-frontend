@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Plus, Trash2, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/api"
@@ -202,12 +203,13 @@ export function QuotationForm() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="validUntil">Valid Until</Label>
-                  <Input
+                  <DatePicker
                     id="validUntil"
-                    type="date"
-                    required
-                    value={formData.valid_until}
-                    onChange={(e) => handleInputChange('valid_until', e.target.value)}
+                    value={formData.valid_until ? new Date(formData.valid_until) : undefined}
+                    onChange={(date) => handleInputChange('valid_until', date?.toISOString().split('T')[0] || '')}
+                    placeholder="DD/MM/YYYY"
+                    useIST={true}
+                    minDate={new Date()}
                   />
                 </div>
               </div>
@@ -248,12 +250,13 @@ export function QuotationForm() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="validUntil">Valid Until</Label>
-                    <Input
+                    <DatePicker
                       id="validUntil"
-                      type="date"
-                      required
-                      value={formData.valid_until}
-                      onChange={(e) => handleInputChange('valid_until', e.target.value)}
+                      value={formData.valid_until ? new Date(formData.valid_until) : undefined}
+                      onChange={(date) => handleInputChange('valid_until', date?.toISOString().split('T')[0] || '')}
+                      placeholder="DD/MM/YYYY"
+                      useIST={true}
+                      minDate={new Date()}
                     />
                   </div>
                 </div>
