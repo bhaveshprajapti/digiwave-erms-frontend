@@ -20,6 +20,8 @@ import {
   FlexibleTimingBalance,
   CreateFlexibleTimingRequest
 } from "@/lib/api/flexible-timing"
+import { leaveEvents } from "@/hooks/use-leave-updates"
+import { authService } from "@/lib/auth"
 
 interface FlexibleTimingFormProps {
   onSuccess?: () => void
@@ -162,12 +164,16 @@ export function FlexibleTimingForm({ onSuccess }: FlexibleTimingFormProps) {
         is_emergency: isEmergency
       }
 
-      await createFlexibleTimingRequest(requestData)
+      const newRequest = await createFlexibleTimingRequest(requestData)
       
       toast({
         title: "Success",
         description: "Flexible timing request submitted successfully"
       })
+
+      // Dispatch event for real-time updates
+      const user = authService.getUserData()
+      leaveEvents.requestCreated(newRequest?.id || Date.now(), user?.id || 0)
 
       // Reset form
       setTimingType("")

@@ -19,6 +19,7 @@ import { AlertTriangle, Calendar, Clock, Timer } from "lucide-react"
 import { useLeaveRequestsContext } from "@/contexts/leave-requests-context"
 import { FlexibleTimingForm } from "./flexible-timing-form"
 import { formatUTCtoISTDate, getISTDateString } from "@/lib/timezone"
+import { leaveEvents } from "@/hooks/use-leave-updates"
 
 // Helper function to calculate duration (EXACTLY like backend Django model)
 function calculateDuration(startDate: string, endDate: string): number {
@@ -154,7 +155,7 @@ export function LeaveRequestForm() {
     return existingRequests.some((request: any) => {
       // Only check active requests (pending or approved)
       const status = request.status
-      const isActive = status === 1 || status === 2 || status === 'pending' || status === 'approved' || !status
+      const isActive = status === 1 || status === 2 || status === 'pending' || status === 'approved' || status === 'draft' || !status
       
       if (!isActive) return false
       
@@ -208,13 +209,12 @@ export function LeaveRequestForm() {
       // Get status name
       const getStatusName = (status: any) => {
         if (typeof status === 'string') {
-          return status.toLowerCase() === 'pending' ? 'pending' : 
-                 status.toLowerCase() === 'approved' ? 'approved' : 
-                 status.toLowerCase() === 'rejected' ? 'rejected' : 'pending'
+          return status.toLowerCase()
         }
         return status === 1 ? 'pending' : 
                status === 2 ? 'approved' : 
-               status === 3 ? 'rejected' : 'pending'
+               status === 3 ? 'rejected' : 
+               status === 4 ? 'cancelled' : 'pending'
       }
       
       const statusName = getStatusName(conflictingRequest?.status)
@@ -323,12 +323,15 @@ export function LeaveRequestForm() {
         requestData.total_days = calculateTotalDays()
       }
 
-      await createLeaveRequest(requestData)
+      const newRequest = await createLeaveRequest(requestData)
       
       toast({ 
         title: 'Success', 
         description: 'Your leave request has been submitted successfully.' 
       })
+      
+      // Dispatch event for real-time updates
+      leaveEvents.requestCreated(newRequest?.id || Date.now(), user.id)
       
       // Reset form
       setLeaveType("")

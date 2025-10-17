@@ -11,14 +11,14 @@ import { getMyLeaveApplications } from "@/lib/api/leave-requests"
 import authService from "@/lib/auth"
 import api from "@/lib/api"
 import { attendanceEvents, useAttendanceUpdates } from "@/hooks/use-attendance-updates"
-import { 
-  getCurrentIST, 
-  convertUTCtoIST, 
-  formatUTCtoISTTime, 
+import {
+  getCurrentIST,
+  convertUTCtoIST,
+  formatUTCtoISTTime,
   formatUTCtoISTDate,
   getISTDateString,
   formatDuration,
-  isToday 
+  isToday
 } from "@/lib/timezone"
 import Swal from 'sweetalert2'
 

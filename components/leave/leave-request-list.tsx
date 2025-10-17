@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast"
 import { CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react"
 import { formatUTCtoISTDate, getISTDateString } from "@/lib/timezone"
 import { useLeaveRequestsContext } from "@/contexts/leave-requests-context"
+import { leaveEvents } from "@/hooks/use-leave-updates"
 
 // Duration calculation function (EXACTLY like backend Django model)
 function calculateDuration(startDate: string, endDate: string): number {
@@ -42,43 +43,49 @@ function getStatusBadge(status?: string | number | null) {
   let badgeClass = ''
   let icon = null
 
-  // Handle different status formats
-  let statusValue = status
+  // Handle different status formats - prioritize string values from backend
+  let normalizedStatus = status
   if (typeof status === 'string') {
-    switch (status.toLowerCase()) {
-      case 'pending': statusValue = 1; break
-      case 'approved': statusValue = 2; break
-      case 'rejected': statusValue = 3; break
-      case 'cancelled': statusValue = 4; break
-      default: statusValue = 0
+    normalizedStatus = status.toLowerCase()
+  } else if (typeof status === 'number') {
+    // Convert legacy numeric status to string
+    switch (status) {
+      case 1: normalizedStatus = 'pending'; break
+      case 2: normalizedStatus = 'approved'; break
+      case 3: normalizedStatus = 'rejected'; break
+      case 4: normalizedStatus = 'cancelled'; break
+      default: normalizedStatus = 'unknown'
     }
   }
 
-  switch (statusValue) {
-    case 1:
+  switch (normalizedStatus) {
     case 'pending':
+    case 'draft':
       statusName = 'Pending'
       badgeVariant = 'outline'
       badgeClass = 'bg-yellow-50 text-yellow-700 border-yellow-200'
       icon = <Clock className="w-3 h-3 mr-1" />
       break
-    case 2:
     case 'approved':
       statusName = 'Approved'
       badgeVariant = 'default'
       badgeClass = 'bg-green-50 text-green-700 border-green-200'
       icon = <CheckCircle className="w-3 h-3 mr-1" />
       break
-    case 3:
     case 'rejected':
       statusName = 'Rejected'
       badgeVariant = 'destructive'
       badgeClass = 'bg-red-50 text-red-700 border-red-200'
       icon = <XCircle className="w-3 h-3 mr-1" />
       break
-    case 4:
     case 'cancelled':
       statusName = 'Cancelled'
+      badgeVariant = 'secondary'
+      badgeClass = 'bg-gray-50 text-gray-700 border-gray-200'
+      icon = <AlertTriangle className="w-3 h-3 mr-1" />
+      break
+    case 'expired':
+      statusName = 'Expired'
       badgeVariant = 'secondary'
       badgeClass = 'bg-gray-50 text-gray-700 border-gray-200'
       icon = <AlertTriangle className="w-3 h-3 mr-1" />
@@ -167,7 +174,7 @@ export function LeaveRequestList() {
         types.forEach((t: any) => { map[t.id] = t.name })
         setTypesMap(map)
         
-        // Load requests into context
+        // Load requests into context - force refresh to get latest status
         await refreshAll()
         
         // Load flexible timing requests
@@ -189,6 +196,20 @@ export function LeaveRequestList() {
       endDate: end
     })
   }, [userId, start, end, setFilters])
+
+  // Auto-refresh every 10 seconds to catch status updates (reduced from 30s)
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        await refreshAll()
+        await fetchFlexibleTimingRequests()
+      } catch (error) {
+        console.error('Auto-refresh failed:', error)
+      }
+    }, 10000) // 10 seconds - much more responsive
+
+    return () => clearInterval(interval)
+  }, [refreshAll])
 
   return (
     <>
@@ -227,7 +248,7 @@ export function LeaveRequestList() {
               },
               { key: 'leave', header: 'Type/Category', cell: (r) => (
                 <button className="text-primary hover:underline font-medium" onClick={() => { setSelected(r); setOpen(true) }}>
-                  {(r as any).leave_type_name || 'Unknown'}
+                  {(r as any).leave_type_name || typesMap[(r as any).leave_type] || 'Unknown'}
                 </button>
               )},
               { 
@@ -260,7 +281,7 @@ export function LeaveRequestList() {
                 const startDate = request.start_date
                 
                 // User can delete if it's pending and before start date
-                const canUserDelete = (request.status === 'pending' || !request.status) && startDate > today
+                const canUserDelete = (request.status === 'pending' || request.status === 'draft' || request.status === 1 || !request.status) && startDate > today
                 
                 return (
                   <div className="flex items-center justify-center">
@@ -273,11 +294,15 @@ export function LeaveRequestList() {
                             toast({ title: 'Deleted', description: 'Flexible timing request deleted successfully.' })
                             // Refresh flexible timing requests
                             await fetchFlexibleTimingRequests()
+                            // Dispatch event for real-time updates
+                            leaveEvents.requestDeleted(request.id, userId || 0)
                           } else {
                             await deleteLeaveRequest(request.id)
                             toast({ title: 'Deleted', description: 'Leave request deleted successfully.' })
                             // Remove from context and refresh
                             removeRequest(request.id)
+                            // Dispatch event for real-time updates
+                            leaveEvents.requestDeleted(request.id, userId || 0)
                             await refreshAll()
                           }
                         } catch (e: any) {
@@ -307,7 +332,7 @@ export function LeaveRequestList() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <span className="text-muted-foreground font-medium">Leave Type:</span>
-                  <p className="mt-1">{typesMap[selected.leave_type] || `#${selected.leave_type}`}</p>
+                  <p className="mt-1">{selected.leave_type_name || typesMap[selected.leave_type] || `#${selected.leave_type}`}</p>
                 </div>
                 <div>
                   <span className="text-muted-foreground font-medium">Status:</span>
@@ -324,12 +349,12 @@ export function LeaveRequestList() {
                 <div>
                   <span className="text-muted-foreground font-medium">Duration:</span>
                   <p className="mt-1">
-                    {selected.total_days || calculateDuration(selected.start_date, selected.end_date)} day(s)
+                    {selected.duration_text || selected.total_days || calculateDuration(selected.start_date, selected.end_date)} day(s)
                   </p>
                 </div>
                 <div>
                   <span className="text-muted-foreground font-medium">Applied:</span>
-                  <p className="mt-1">{selected.created_at ? formatDate(selected.created_at) : 'N/A'}</p>
+                  <p className="mt-1">{selected.applied_at ? formatDate(selected.applied_at) : selected.created_at ? formatDate(selected.created_at) : 'N/A'}</p>
                 </div>
               </div>
               

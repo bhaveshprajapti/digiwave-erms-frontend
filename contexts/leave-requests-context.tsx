@@ -1,9 +1,10 @@
 "use client"
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
-import { getLeaveRequests } from '@/lib/api/leave-requests'
+import { getLeaveRequests, getMyLeaveApplications } from '@/lib/api/leave-requests'
 import { getMyLeaveBalances } from '@/lib/api/leave-balances'
 import { LeaveRequest } from '@/lib/schemas'
+import { useLeaveUpdates } from '@/hooks/use-leave-updates'
 
 interface LeaveRequestsContextType {
   // State
@@ -18,6 +19,7 @@ interface LeaveRequestsContextType {
   addRequest: (request: LeaveRequest) => void
   updateRequest: (id: number, updates: Partial<LeaveRequest>) => void
   removeRequest: (id: number) => void
+  setRequests: (requests: LeaveRequest[]) => void
   
   // Filters
   filteredRequests: LeaveRequest[]
@@ -47,7 +49,8 @@ export function LeaveRequestsProvider({ children }: LeaveRequestsProviderProps) 
   const refreshRequests = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await getLeaveRequests()
+      // Use getMyLeaveApplications for employee's own requests to ensure latest status
+      const data = await getMyLeaveApplications()
       setRequests(data)
     } catch (error) {
       console.error('Failed to refresh requests:', error)
@@ -55,6 +58,9 @@ export function LeaveRequestsProvider({ children }: LeaveRequestsProviderProps) 
       setLoading(false)
     }
   }, [])
+
+  // Listen for leave events and auto-refresh
+  useLeaveUpdates(refreshRequests)
 
   const refreshBalances = useCallback(async () => {
     try {
@@ -69,7 +75,7 @@ export function LeaveRequestsProvider({ children }: LeaveRequestsProviderProps) 
     setLoading(true)
     try {
       const [requestsData, balancesData] = await Promise.all([
-        getLeaveRequests(),
+        getMyLeaveApplications(), // Use employee-specific API for latest status
         getMyLeaveBalances().catch(() => [])
       ])
       setRequests(requestsData)
@@ -126,6 +132,7 @@ export function LeaveRequestsProvider({ children }: LeaveRequestsProviderProps) 
     addRequest,
     updateRequest,
     removeRequest,
+    setRequests,
     filteredRequests,
     setFilters
   }
@@ -150,11 +157,19 @@ export function useAdminLeaveRequests() {
   const context = useLeaveRequestsContext()
   
   const refreshAdminRequests = useCallback(async () => {
-    await context.refreshRequests()
+    // Admin should use the full API to see all requests
+    try {
+      const data = await getLeaveRequests()
+      context.setRequests(data)
+    } catch (error) {
+      console.error('Failed to refresh admin requests:', error)
+    }
   }, [context])
 
   return {
     ...context,
-    refreshAdminRequests
+    refreshAdminRequests,
+    // Override refresh for admin to use full API
+    refreshRequests: refreshAdminRequests
   }
 }

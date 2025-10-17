@@ -5,7 +5,7 @@ export interface AttendanceDTO {
   id: number
   user: number
   date: string // YYYY-MM-DD
-  sessions?: any
+  sessions?: any[]  // Changed from any to any[] to ensure it's always an array
   total_hours?: string | null // HH:MM:SS
   total_break_time?: string | null // HH:MM:SS
   location?: any
@@ -13,6 +13,7 @@ export interface AttendanceDTO {
   created_at?: string
   attendance_status?: string
   calendar_status?: string
+  day_ended?: boolean  // Added missing field
 }
 
 const base = "/attendance/attendances/"

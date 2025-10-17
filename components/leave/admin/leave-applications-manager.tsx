@@ -32,6 +32,7 @@ import { LeaveRequest } from "@/lib/schemas"
 import { CheckCircle, MessageSquare, Search, XCircle } from "lucide-react"
 import Swal from 'sweetalert2'
 import { useAdminLeaveRequests } from "@/contexts/leave-requests-context"
+import { leaveEvents } from "@/hooks/use-leave-updates"
 
 // Extended type for applications with runtime-added properties
 interface ExtendedApplication extends Omit<Partial<LeaveRequest>, 'status'> {
@@ -77,7 +78,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
   const { toast } = useToast()
   
   // Use centralized state management
-  const { requests: leaveApplications, loading, refreshAll, removeRequest, updateRequest } = useAdminLeaveRequests()
+  const { requests: leaveApplications, loading, refreshAdminRequests, removeRequest, updateRequest } = useAdminLeaveRequests()
 
   // Fetch flexible timing requests
   useEffect(() => {
@@ -165,7 +166,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
       
       const status = app.status
       const matchesStatus = statusFilter === "all" || 
-        (statusFilter === "pending" && (!status || status === 1 || status === "pending")) ||
+        (statusFilter === "pending" && (!status || status === 1 || status === "pending" || status === "draft")) ||
         (statusFilter === "approved" && (status === 2 || status === "approved")) ||
         (statusFilter === "rejected" && (status === 3 || status === "rejected")) ||
         (statusFilter === "cancelled" && (status === 4 || status === "cancelled"))
@@ -188,7 +189,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
       setUsers(usersData)
       
       // Refresh applications through context
-      await refreshAll()
+      await refreshAdminRequests()
     } catch (error: any) {
       console.error('Failed to load applications:', error)
       toast({
@@ -223,6 +224,8 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
       if (isFlexibleTiming) {
         await deleteFlexibleTimingRequest(app.id)
         toast({ title: 'Success', description: 'Flexible timing request deleted successfully', variant: 'success' })
+        // Dispatch event for real-time updates
+        leaveEvents.requestDeleted(app.id, app.user || 0)
         // Refresh flexible timing requests
         const flexibleRequests = await getFlexibleTimingRequests()
         const typedRequests = flexibleRequests.map((req: any) => ({
@@ -240,9 +243,11 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
       } else {
         await deleteLeaveRequest(app.id)
         toast({ title: 'Success', description: 'Leave request deleted successfully', variant: 'success' })
+        // Dispatch event for real-time updates
+        leaveEvents.requestDeleted(app.id, app.user || 0)
         // Remove from context and refresh
         removeRequest(app.id)
-        await refreshAll()
+        await refreshAdminRequests()
       }
     } catch (error: any) {
       toast({ title: 'Error', description: error?.response?.data?.detail || 'Failed to delete request', variant: 'destructive' })
@@ -277,6 +282,8 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
           description: "Flexible timing request approved successfully",
           variant: "success"
         })
+        // Dispatch event for real-time updates
+        leaveEvents.statusChanged(application.id, application.user || 0, 'approved')
         // Refresh flexible timing requests
         const flexibleRequests = await getFlexibleTimingRequests()
         const typedRequests = flexibleRequests.map((req: any) => ({
@@ -298,9 +305,11 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
           description: "Leave application approved successfully",
           variant: "success"
         })
+        // Dispatch event for real-time updates
+        leaveEvents.statusChanged(application.id, application.user || 0, 'approved')
         // Update the request status in context and refresh
         updateRequest(application.id, { status: 2 as any })
-        await refreshAll()
+        await refreshAdminRequests()
       }
     } catch (error: any) {
       console.error('Approval error:', error)
@@ -333,12 +342,14 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
         description: "Leave application approved successfully",
         variant: "success"
       })
+      // Dispatch event for real-time updates
+      leaveEvents.statusChanged(selectedApplication.id, selectedApplication.user || 0, 'approved')
       setViewMode(null)
       setSelectedApplication(null)
       setActionComment("")
       // Update the request status in context and refresh
       updateRequest(selectedApplication.id, { status: 2 as any })
-      await refreshAll()
+      await refreshAdminRequests()
     } catch (error: any) {
       console.error('Approval error:', error)
       toast({
@@ -372,6 +383,8 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
           description: "Flexible timing request rejected successfully",
           variant: "success"
         })
+        // Dispatch event for real-time updates
+        leaveEvents.statusChanged(selectedApplication.id, selectedApplication.user || 0, 'rejected')
         // Refresh flexible timing requests
         const flexibleRequests = await getFlexibleTimingRequests()
         const typedRequests = flexibleRequests.map((req: any) => ({
@@ -393,9 +406,11 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
           description: "Leave application rejected successfully",
           variant: "success"
         })
+        // Dispatch event for real-time updates
+        leaveEvents.statusChanged(selectedApplication.id, selectedApplication.user || 0, 'rejected')
         // Update the request status in context and refresh
         updateRequest(selectedApplication.id, { status: 3 as any, rejection_reason: rejectionReason })
-        await refreshAll()
+        await refreshAdminRequests()
       }
       
       setViewMode(null)
@@ -436,46 +451,50 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
   }
 
   const getStatusBadge = (status?: number | null | string) => {
-    // Handle different status formats (number, string, or null)
-    let statusValue: number = 0
+    // Handle different status formats - prioritize string values from backend
     let statusName = 'Unknown'
     let badgeVariant: any = 'outline'
     let badgeClass = ''
 
-    // Convert input to number
-    if (status !== null && status !== undefined) {
-      if (typeof status === 'string') {
-        const lowerStatus = status.toLowerCase()
-        switch (lowerStatus) {
-          case 'pending': statusValue = 1; break
-          case 'approved': statusValue = 2; break
-          case 'rejected': statusValue = 3; break
-          case 'cancelled': statusValue = 4; break
-          default: statusValue = 0
-        }
-      } else if (typeof status === 'number') {
-        statusValue = status
+    // Normalize status to string
+    let normalizedStatus = status
+    if (typeof status === 'string') {
+      normalizedStatus = status.toLowerCase()
+    } else if (typeof status === 'number') {
+      // Convert legacy numeric status to string
+      switch (status) {
+        case 1: normalizedStatus = 'pending'; break
+        case 2: normalizedStatus = 'approved'; break
+        case 3: normalizedStatus = 'rejected'; break
+        case 4: normalizedStatus = 'cancelled'; break
+        default: normalizedStatus = 'unknown'
       }
     }
 
-    switch (statusValue) {
-      case 1:
+    switch (normalizedStatus) {
+      case 'pending':
+      case 'draft':
         statusName = 'Pending'
         badgeVariant = 'outline'
         badgeClass = 'bg-yellow-50 text-yellow-700 border-yellow-200'
         break
-      case 2:
+      case 'approved':
         statusName = 'Approved'
         badgeVariant = 'default'
         badgeClass = 'bg-green-50 text-green-700 border-green-200'
         break
-      case 3:
+      case 'rejected':
         statusName = 'Rejected'
         badgeVariant = 'destructive'
         badgeClass = 'bg-red-50 text-red-700 border-red-200'
         break
-      case 4:
+      case 'cancelled':
         statusName = 'Cancelled'
+        badgeVariant = 'secondary'
+        badgeClass = 'bg-gray-50 text-gray-700 border-gray-200'
+        break
+      case 'expired':
+        statusName = 'Expired'
         badgeVariant = 'secondary'
         badgeClass = 'bg-gray-50 text-gray-700 border-gray-200'
         break
@@ -509,7 +528,7 @@ export function LeaveApplicationsManager({ className }: LeaveApplicationsManager
   const isPendingApplication = (app: LeaveRequest | any) => {
     // Handle both string and number status formats
     if (typeof app.status === 'string') {
-      return app.status.toLowerCase() === 'pending' || !app.status
+      return app.status.toLowerCase() === 'pending' || app.status.toLowerCase() === 'draft' || !app.status
     }
     return !app.status || app.status === 1
   }

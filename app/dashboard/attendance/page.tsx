@@ -3,11 +3,6 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { authService } from "@/lib/auth"
-import { AttendanceClockCard } from "@/components/attendance/attendance-clock-card"
-import { AttendanceCalendar } from "@/components/attendance/attendance-calendar"
-import { AttendanceHistory } from "@/components/attendance/attendance-history"
-import { AttendanceStatsCards } from "@/components/attendance/admin/attendance-stats-cards"
-import { AttendanceCharts } from "@/components/attendance/admin/attendance-charts"
 import { Card, CardContent } from "@/components/ui/card"
 
 export default function AttendancePage() {

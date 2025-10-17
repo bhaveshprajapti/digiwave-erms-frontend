@@ -7,12 +7,14 @@ import { CalendarIcon, ClockIcon, UserIcon, FileTextIcon } from "lucide-react"
 interface LeaveData {
   id: number
   leave_type: number
+  leave_type_name?: string
   start_date: string
   end_date: string
-  status?: number
+  status?: number | string
   reason: string
   rejection_reason?: string | null
   created_at?: string
+  applied_at?: string
   half_day_type?: string | null
 }
 
@@ -25,15 +27,53 @@ interface LeaveDetailsModalProps {
 export function LeaveDetailsModal({ open, onOpenChange, leave }: LeaveDetailsModalProps) {
   if (!leave) return null
 
-  const getStatusInfo = (status?: number) => {
-    switch (status) {
-      case 1:
-        return { label: 'Approved', variant: 'success' as const, color: 'text-green-700' }
-      case 2:
-        return { label: 'Rejected', variant: 'destructive' as const, color: 'text-red-700' }
-      case 0:
+  const getStatusInfo = (status?: number | string) => {
+    // Handle both string and numeric status values
+    let normalizedStatus = status
+    if (typeof status === 'string') {
+      normalizedStatus = status.toLowerCase()
+    } else if (typeof status === 'number') {
+      switch (status) {
+        case 2: normalizedStatus = 'approved'; break
+        case 3: normalizedStatus = 'rejected'; break
+        case 1: normalizedStatus = 'pending'; break
+        default: normalizedStatus = 'pending'
+      }
+    }
+
+    switch (normalizedStatus) {
+      case 'approved':
+        return { 
+          label: 'Approved', 
+          variant: 'default' as const, 
+          className: 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200' 
+        }
+      case 'rejected':
+        return { 
+          label: 'Rejected', 
+          variant: 'destructive' as const, 
+          className: 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200' 
+        }
+      case 'cancelled':
+        return { 
+          label: 'Cancelled', 
+          variant: 'secondary' as const, 
+          className: 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200' 
+        }
+      case 'expired':
+        return { 
+          label: 'Expired', 
+          variant: 'secondary' as const, 
+          className: 'bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-200' 
+        }
+      case 'pending':
+      case 'draft':
       default:
-        return { label: 'Pending', variant: 'secondary' as const, color: 'text-orange-700' }
+        return { 
+          label: 'Pending', 
+          variant: 'secondary' as const, 
+          className: 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200' 
+        }
     }
   }
 
@@ -89,9 +129,9 @@ export function LeaveDetailsModal({ open, onOpenChange, leave }: LeaveDetailsMod
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <UserIcon className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{getLeaveTypeName(leave.leave_type)}</span>
+              <span className="font-medium">{leave.leave_type_name || getLeaveTypeName(leave.leave_type)}</span>
             </div>
-            <Badge variant={statusInfo.variant} className={statusInfo.color}>
+            <Badge variant={statusInfo.variant} className={statusInfo.className}>
               {statusInfo.label}
             </Badge>
           </div>
@@ -137,7 +177,7 @@ export function LeaveDetailsModal({ open, onOpenChange, leave }: LeaveDetailsMod
           </div>
 
           {/* Rejection Reason (if rejected) */}
-          {leave.status === 2 && leave.rejection_reason && (
+          {(leave.status === 3 || leave.status === 'rejected') && leave.rejection_reason && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <FileTextIcon className="h-4 w-4 text-red-500" />
@@ -150,10 +190,10 @@ export function LeaveDetailsModal({ open, onOpenChange, leave }: LeaveDetailsMod
           )}
 
           {/* Application Date */}
-          {leave.created_at && (
+          {(leave.applied_at || leave.created_at) && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <ClockIcon className="h-4 w-4" />
-              <span>Applied on: {formatDateTime(leave.created_at)}</span>
+              <span>Applied on: {formatDateTime(leave.applied_at || leave.created_at)}</span>
             </div>
           )}
 

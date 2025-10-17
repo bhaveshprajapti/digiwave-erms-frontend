@@ -11,6 +11,7 @@ import { getMyLeaveApplications } from "@/lib/api/leave-requests"
 import { authService } from "@/lib/auth"
 import { useHolidays } from "@/hooks/use-holidays"
 import { useAttendanceUpdates } from "@/hooks/use-attendance-updates"
+import { useLeaveUpdates } from "@/hooks/use-leave-updates"
 import { LeaveRequest } from "@/lib/schemas"
 import { getDateRange, parseDateFromBackend } from "@/lib/utils/date-utils"
 
@@ -24,13 +25,15 @@ interface AttendanceData {
 interface LeaveData {
   id: number
   leave_type: number
+  leave_type_name?: string
   start_date: string
   end_date: string
-  status?: number
+  status?: string | number  // Backend sends string, but support both
   reason: string
-  rejection_reason?: string | null
+  rejection_reason?: string
   created_at?: string
-  half_day_type?: string | null
+  applied_at?: string
+  half_day_type?: string
 }
 
 export function EnhancedAttendanceCalendar() {
@@ -63,6 +66,14 @@ export function EnhancedAttendanceCalendar() {
   useAttendanceUpdates(() => {
     if (userId) {
       console.log('Enhanced Calendar: Attendance event received - refreshing data')
+      loadData()
+    }
+  })
+
+  // Listen for leave updates and refresh calendar
+  useLeaveUpdates(() => {
+    if (userId) {
+      console.log('Enhanced Calendar: Leave event received - refreshing data')
       loadData()
     }
   })
@@ -121,13 +132,14 @@ export function EnhancedAttendanceCalendar() {
         attendanceMap[record.date] = {
           status,
           sessions,
-          total_hours: record.total_hours,
-          notes: record.notes
+          total_hours: record.total_hours || undefined,
+          notes: record.notes || undefined
         }
       }
 
       // Load leave data
       const leaveResponse = await getMyLeaveApplications({})
+      console.log('Enhanced Calendar: Loaded leave applications:', leaveResponse)
       const leaveMap: Record<string, LeaveData[]> = {}
 
       // Process leave requests to map them to dates using centralized date utilities
@@ -144,14 +156,17 @@ export function EnhancedAttendanceCalendar() {
           leaveMap[dateStr].push({
             id: leave.id,
             leave_type: leave.leave_type,
+            leave_type_name: leave.leave_type_name,
             start_date: leave.start_date,
             end_date: leave.end_date,
-            status: leave.status,
+            status: leave.status || undefined,
             reason: leave.reason,
-            rejection_reason: leave.rejection_reason,
+            rejection_reason: leave.rejection_reason || undefined,
             created_at: leave.created_at,
-            half_day_type: leave.half_day_type
+            applied_at: leave.applied_at,
+            half_day_type: leave.half_day_type || undefined
           })
+          console.log(`Enhanced Calendar: Added leave for ${dateStr}, status: "${leave.status}" (type: ${typeof leave.status})`)
         }
       }
 
@@ -225,10 +240,23 @@ export function EnhancedAttendanceCalendar() {
   const getLeaveStatus = (leaves: LeaveData[]) => {
     // Return status based on first leave (if multiple leaves on same date)
     const leave = leaves[0]
-    switch (leave.status) {
-      case 1: return 'approved'
-      case 2: return 'rejected' 
-      case 0:
+    const status = leave.status
+    
+    // Handle both string and numeric status values
+    if (typeof status === 'string') {
+      const lowerStatus = status.toLowerCase()
+      if (lowerStatus === 'approved') return 'approved'
+      if (lowerStatus === 'rejected') return 'rejected'
+      if (lowerStatus === 'cancelled') return 'rejected'
+      return 'pending'
+    }
+    
+    // Handle numeric status (legacy)
+    switch (status) {
+      case 2: return 'approved'   // 2 = approved
+      case 3: return 'rejected'   // 3 = rejected
+      case 4: return 'rejected'   // 4 = cancelled
+      case 1:                     // 1 = pending
       default: return 'pending'
     }
   }

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Clock, LogIn, LogOut, Timer, Users, Coffee, CheckCircle } from "lucide-react"
+import { Clock, LogIn, LogOut, Timer, Users, Coffee, CheckCircle, Calendar } from "lucide-react"
 import { formatUTCtoISTTime, formatUTCtoISTDate } from "@/lib/timezone"
 
 interface SessionDetailsModalProps {
@@ -79,6 +79,60 @@ export function SessionDetailsModal({ open, onOpenChange, attendance }: SessionD
         </DialogHeader>
         
         <div className="space-y-6">
+          {/* Leave Information (if applicable) */}
+          {attendance.leave_info && (
+            <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-blue-100/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Leave Application
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Status:</span>
+                  <Badge 
+                    className={
+                      (attendance.leave_info.status === 2 || attendance.leave_info.status === 'approved')
+                        ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200'
+                        : (attendance.leave_info.status === 3 || attendance.leave_info.status === 'rejected')
+                        ? 'bg-red-100 text-red-800 border-red-200 hover:bg-red-200'
+                        : 'bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200'
+                    }
+                  >
+                    {(attendance.leave_info.status === 2 || attendance.leave_info.status === 'approved') ? 'Approved' : 
+                     (attendance.leave_info.status === 3 || attendance.leave_info.status === 'rejected') ? 'Rejected' : 'Pending'}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Leave Type:</span>
+                  <span className="text-sm text-muted-foreground">
+                    {attendance.leave_info.leave_type_name || `Leave Type ${attendance.leave_info.leave_type}`}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Reason:</span>
+                  <span className="text-sm text-muted-foreground">{attendance.leave_info.reason}</span>
+                </div>
+                {attendance.leave_info.half_day_type && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Type:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {attendance.leave_info.half_day_type === 'morning' ? 'Morning Half Day' : 'Afternoon Half Day'}
+                    </Badge>
+                  </div>
+                )}
+                {attendance.leave_info.status === 3 && attendance.leave_info.rejection_reason && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                    <p className="text-sm text-red-700">
+                      <strong>Rejection Reason:</strong> {attendance.leave_info.rejection_reason}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Summary Stats Cards - Compact */}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             {/* Total Working Hours Card */}

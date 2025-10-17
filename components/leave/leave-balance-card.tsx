@@ -50,10 +50,10 @@ export function LeaveBalanceCard() {
         const used = Number(balance.used_balance) || 0
         const remaining = Number(balance.remaining_balance) || 0
         const percent = total > 0 ? (remaining / total) * 100 : 0
-        
+
         return (
-          <Card 
-            key={`${balance.leave_type}-${balance.year}`} 
+          <Card
+            key={`${balance.leave_type}-${balance.year}`}
             className="border-l-4 bg-gradient-to-br from-card to-muted/20"
             style={{ borderLeftColor: balance.leave_type_color || '#007bff' }}
           >

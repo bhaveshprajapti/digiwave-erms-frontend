@@ -154,17 +154,44 @@ export interface LeaveBalance {
 export interface LeaveRequest {
   id: number
   user: number
+  user_name?: string
+  user_username?: string
   leave_type: number
+  leave_type_name?: string
+  leave_type_code?: string
+  leave_type_color?: string
+  policy?: number
+  policy_name?: string
   start_date: string // YYYY-MM-DD
   end_date: string // YYYY-MM-DD
-  duration_days: string
-  total_days?: number // Added for backend compatibility
-  half_day_type?: string | null
+  total_days?: number
+  duration_text?: string
+  is_half_day?: boolean
+  half_day_period?: string
   reason: string
-  document?: string | null
-  status?: number | null
-  approver?: number | null
+  emergency_contact?: string
+  emergency_phone?: string
+  work_handover?: string
+  status?: string | null // Changed from number to string to match backend
+  approved_by?: number | null
+  approved_by_name?: string
+  approved_at?: string
   rejection_reason?: string | null
-  organization: number
+  admin_comments?: string | null
+  applied_at?: string
+  updated_at?: string
+  attachment?: string | null
+  comments?: any[]
+  comments_count?: number
+  can_be_cancelled?: boolean
+  can_be_edited?: boolean
+  can_be_deleted_by_user?: boolean
+  can_be_deleted_by_admin?: boolean
+  // Legacy fields for backward compatibility
+  duration_days?: string
+  document?: string | null
+  approver?: number | null
+  organization?: number
   created_at?: string
+  half_day_type?: string | null
 }

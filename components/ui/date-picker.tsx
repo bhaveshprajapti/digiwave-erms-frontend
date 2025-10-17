@@ -31,18 +31,11 @@ interface DatePickerProps {
 function formatDate(date: Date | undefined, fmt: 'MM-DD-YYYY' | 'DD/MM/YYYY' = 'DD/MM/YYYY', useIST: boolean = true) {
   if (!date) return ''
   
-  if (useIST) {
-    // Use IST timezone utilities for consistent formatting
-    const istDateString = getISTDateString(date)
-    const [year, month, day] = istDateString.split('-')
-    return fmt === 'DD/MM/YYYY' ? `${day}/${month}/${year}` : `${month}-${day}-${year}`
-  } else {
-    // Fallback to local date parts
-    const dd = String(date.getDate()).padStart(2, '0')
-    const mm = String(date.getMonth() + 1).padStart(2, '0')
-    const yyyy = date.getFullYear()
-    return fmt === 'DD/MM/YYYY' ? `${dd}/${mm}/${yyyy}` : `${mm}-${dd}-${yyyy}`
-  }
+  // Always use local date parts to avoid timezone conversion issues
+  const dd = String(date.getDate()).padStart(2, '0')
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const yyyy = date.getFullYear()
+  return fmt === 'DD/MM/YYYY' ? `${dd}/${mm}/${yyyy}` : `${mm}-${dd}-${yyyy}`
 }
 
 function parseInputToDate(text: string, preferDMY = true, useIST = true): Date | undefined {
@@ -58,22 +51,12 @@ function parseInputToDate(text: string, preferDMY = true, useIST = true): Date |
     
     // Validate ranges
     if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12 && yyyy >= 1900 && yyyy <= 2100) {
-      if (useIST) {
-        // Create IST date string and parse it properly
-        const istDateString = `${yyyy}-${mm.toString().padStart(2, '0')}-${dd.toString().padStart(2, '0')}`
-        const d = new Date(istDateString + 'T12:00:00')
-        
-        // Verify the date is valid
-        if (d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd) {
-          return d
-        }
-      } else {
-        // Create date at noon to avoid timezone issues
-        const d = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0)
-        // Verify the date is valid (e.g., Feb 30th would be invalid)
-        if (d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd) {
-          return d
-        }
+      // Always create date using local constructor to avoid timezone shifts
+      const d = new Date(yyyy, mm - 1, dd, 12, 0, 0, 0)
+      
+      // Verify the date is valid (e.g., Feb 30th would be invalid)
+      if (d.getFullYear() === yyyy && d.getMonth() === mm - 1 && d.getDate() === dd) {
+        return d
       }
     }
   }
@@ -225,17 +208,10 @@ export function DatePicker({
           selected={value}
           onSelect={(date) => {
             if (isDisabled) return
-            // Create date at noon to avoid timezone issues
+            // Always create date using local constructor to avoid timezone shifts
             if (date) {
-              if (useIST) {
-                // Create IST-aware date
-                const istDateString = getISTDateString(date)
-                const adjustedDate = new Date(istDateString + 'T12:00:00')
-                onChange?.(adjustedDate)
-              } else {
-                const adjustedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0)
-                onChange?.(adjustedDate)
-              }
+              const adjustedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0)
+              onChange?.(adjustedDate)
             } else {
               onChange?.(date)
             }

@@ -69,7 +69,9 @@ export function EmployeeSessionModal({
       if (response.results.length > 0) {
         const attendanceData = response.results[0]
         setAttendance(attendanceData)
-        setSessions(attendanceData.sessions || [])
+        // Ensure sessions is always an array
+        const sessionsData = Array.isArray(attendanceData.sessions) ? attendanceData.sessions : []
+        setSessions(sessionsData)
         setTotalWorkTime(attendanceData.total_hours || "0:00:00")
         
         // Calculate total break time from sessions if backend value is 0 or missing
@@ -291,7 +293,7 @@ export function EmployeeSessionModal({
                   <User className="h-3 w-3 text-purple-600" />
                 </CardHeader>
                 <CardContent className="pb-2">
-                  <div className="text-lg font-bold text-purple-600">{sessions.length}</div>
+                  <div className="text-lg font-bold text-purple-600">{Array.isArray(sessions) ? sessions.length : 0}</div>
                   <p className="text-xs text-muted-foreground">
                     Check-in sessions
                   </p>
@@ -305,9 +307,9 @@ export function EmployeeSessionModal({
                   <CheckCircle className="h-3 w-3 text-green-600" />
                 </CardHeader>
                 <CardContent className="pb-2">
-                  <div className="text-lg font-bold text-green-600">{sessions.filter((s: any) => s.check_out).length}</div>
+                  <div className="text-lg font-bold text-green-600">{Array.isArray(sessions) ? sessions.filter((s: any) => s.check_out).length : 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    {sessions.length > 0 
+                    {Array.isArray(sessions) && sessions.length > 0 
                       ? `${Math.round((sessions.filter((s: any) => s.check_out).length / sessions.length) * 100)}% completed`
                       : "No sessions"
                     }
@@ -336,7 +338,7 @@ export function EmployeeSessionModal({
                 <CardTitle>Session Details</CardTitle>
               </CardHeader>
               <CardContent>
-                {sessions.length === 0 ? (
+                {!Array.isArray(sessions) || sessions.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     No sessions recorded for this date
                   </div>
@@ -426,7 +428,7 @@ export function EmployeeSessionModal({
             </Card>
 
             {/* Work Efficiency Stats */}
-            {sessions.length > 0 && (
+            {Array.isArray(sessions) && sessions.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>Work Efficiency Analysis</CardTitle>
