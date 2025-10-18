@@ -1,16 +1,17 @@
-import { QuotationList } from "@/components/quotations/quotation-list"
-import { QuotationStats } from "@/components/quotations/quotation-stats"
+'use client'
+
+import { QuotationList } from '@/components/quotations/quotation-list'
 
 export default function QuotationsPage() {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Quotations</h2>
-          <p className="text-muted-foreground">Manage quotes and proposals</p>
-        </div>
-      </div>
-      <QuotationStats />
+    <div className="w-full max-w-[1600px] mx-auto py-6 px-4">
+      {/* <div className="mb-6">
+        <h1 className="text-3xl font-bold">Quotations</h1>
+        <p className="text-muted-foreground">
+          Manage your quotations and proposals
+        </p>
+      </div> */}
+      
       <QuotationList />
     </div>
   )
