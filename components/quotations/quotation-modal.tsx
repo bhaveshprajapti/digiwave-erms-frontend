@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -530,6 +531,9 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
             <Plus className="h-5 w-5" />
             {mode === 'add' ? 'Add New Quotation' : 'Edit Quotation'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {mode === 'add' ? 'Create a new quotation with client details, services, and pricing' : 'Update quotation details including client information, services, and pricing'}
+          </DialogDescription>
         </DialogHeader>
 
         <form id="quotation-form" onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(95vh-240px)] p-6">

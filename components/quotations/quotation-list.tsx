@@ -166,7 +166,7 @@ export function QuotationList() {
     setViewModalOpen(true)
   }
 
-  // PDF download handler - Direct download
+  // PDF download handler - Backend PDF generation using axios
   const handleDownloadPDF = async (quotationId: number) => {
     try {
       toast({
@@ -174,15 +174,27 @@ export function QuotationList() {
         description: 'Please wait...',
       })
 
-      // Fetch full quotation details
-      const response = await apiService.get(`/quotations/${quotationId}/`)
-      const quotationData = response.data
+      // Get the quotation to find its number for filename
+      const quotationResponse = await apiService.get(`/quotations/${quotationId}/`)
+      const quotationNo = quotationResponse.data.quotation_no || quotationId
 
-      // Import the PDF generation function dynamically
-      const { generateAndDownloadQuotationPDF } = await import('@/lib/pdf-utils')
-      
-      // Generate and download PDF
-      await generateAndDownloadQuotationPDF(quotationData)
+      // Call backend PDF generation endpoint using axios with blob response
+      const response = await apiService.get(`/clients/quotations/${quotationId}/download_pdf/`, {
+        responseType: 'blob', // Important: tells axios to expect binary data
+      })
+
+      // Create blob from response
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `Quotation_${quotationNo}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
 
       toast({
         title: 'Success',
